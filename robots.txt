@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://www.cononlabs.com/sitemap.xml
