@@ -6,7 +6,7 @@ From schematic to PCB to prototype — we deliver production-ready hardware engi
 
 ## Embedded Software Development
 
-Real-time firmware and embedded Linux solutions for resource-constrained environments requiring deterministic performance.
+Real-time firmware solutions for resource-constrained environments requiring deterministic performance.
 
 ## Systems Integration
 

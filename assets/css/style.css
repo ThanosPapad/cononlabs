@@ -422,6 +422,16 @@ footer {
 }
 .footer-gh:hover { color: var(--accent); }
 
+/* ─── Markdown images ───────────────────────────────────── */
+.md-image {
+  width: 100%;
+  max-width: 660px;
+  height: auto;
+  display: block;
+  margin: 32px 0;
+  filter: invert(1);
+}
+
 /* ─── Responsive ────────────────────────────────────────── */
 @media (max-width: 680px) {
   .nav-links { display: none; }
