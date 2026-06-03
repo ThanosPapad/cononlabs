@@ -12,9 +12,7 @@ Real-time firmware solutions for resource-constrained environments requiring det
 
 End-to-end integration of hardware and software stacks across communication, power, and compute subsystems.
 
-## Consulting & Technical Advisory
-
-Expert guidance on architecture decisions, component selection, and regulatory compliance for space and defense-adjacent applications.
-
 ## Software development
-All kinds of software thingz. Trust
+Ground Station Control Software
+Custom web-based platform for monitoring, commanding, and scheduling communication windows across multiple ground stations.  
+SDR Integration & Verification.  

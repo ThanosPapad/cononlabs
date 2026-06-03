@@ -12,6 +12,5 @@ High-performance radio frequency hardware for satellite communications, telemetr
 
 End-to-end mission control and telemetry visualization software for small satellite operators and research teams.
 
-## Sensor Fusion Platforms
-
-Multi-sensor integration platforms combining GPS, IMU, and environmental sensors for autonomous terrestrial and aerial systems.
+## Testing / Development platform
+Device for protyping ease, serves hardware and software.

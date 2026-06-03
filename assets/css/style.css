@@ -432,6 +432,13 @@ footer {
   filter: invert(1);
 }
 
+.md-image-noninv {
+  width: 20%;
+  height: auto;
+  display: block;
+  margin: 32px auto;
+}
+
 /* ─── Responsive ────────────────────────────────────────── */
 @media (max-width: 680px) {
   .nav-links { display: none; }
