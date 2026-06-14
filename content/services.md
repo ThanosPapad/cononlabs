@@ -1,18 +1,14 @@
 # Services
 
-## Hardware Design & Prototyping
+## Satellite Communications
 
-From schematic to PCB to prototype — we deliver production-ready hardware engineered for your mission profile.
+Design of RF hardware, communication protocols, and network architectures for space applications.
 
-## Embedded Software Development
+## Ground Segment Infrastructure
+Development of scalable and cost-effective communication systems for satellite operations.
 
-Real-time firmware solutions for resource-constrained environments requiring deterministic performance.
+## Embedded & RF Systems
+Custom electronics, firmware, and signal-processing solutions for demanding environments.
 
-## Systems Integration
-
-End-to-end integration of hardware and software stacks across communication, power, and compute subsystems.
-
-## Software development
-Ground Station Control Software
-Custom web-based platform for monitoring, commanding, and scheduling communication windows across multiple ground stations.  
-SDR Integration & Verification.  
+## Space Technology R&D
+Rapid development and validation of innovative technologies for future space missions. 
