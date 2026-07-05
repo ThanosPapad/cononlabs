@@ -50,13 +50,13 @@ We cut power to SAT1 so it disappears from the "In View" panel, simulating the s
 
 ![SAT1 out of coverage](/assets/images/sat-miss.png)
 
-*SAT1 dropped from coverage; last-seen time tracked.*
+*SAT1 dropped from coverage, last-seen time tracked.*
 
 During this window we scheduled three commands for SAT1 and one for SAT2. The SAT1 commands are held as pending while it is unavailable; the SAT2 command executes immediately.
 
 ![Commands pending for SAT1](/assets/images/sat-pending.png)
 
-*SAT1 commands queued as pending; SAT2 command runs at once.*
+*SAT1 commands queued as pending, SAT2 command runs at once.*
 
 In the video below, SAT1 is reconnected to power, and the moment the ground station recognizes it as available, the pending commands are sent.
 
