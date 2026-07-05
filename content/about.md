@@ -17,7 +17,7 @@ As the number of satellites in orbit continues to grow, communication systems mu
 
 <img src="assets/images/gs-sats.png" alt="Ground station and satellites diagram" class="md-image" />
 
-### Steps to achieve that
+### Steps to achieve that 
 
 - **Develop and Validate** the Communication Hardware
 Design and develop a CubeSat-compatible S-band transceiver that provides full control over the communication stack, from RF hardware to protocol implementation.  
