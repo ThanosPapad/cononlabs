@@ -37,6 +37,32 @@ Satellite operators will access commanding, telemetry, scheduling, and network m
 Demonstrate end-to-end operation of the complete system using multiple transceiver nodes, ground station infrastructure, and realistic orbital communication emulation. The objective is to validate increased ground station utilization, automated communication allocation, and scalable multi-satellite operation in a representative LEO communication environment.
 <img src="assets/images/globe_sats2.png" alt="LEO satellite constellation" style="width: 50%; height: auto; display: block; margin: 32px auto;" />
 
+<style>
+  .md-content a.progress-cta {
+    display: block;
+    width: fit-content;
+    margin: 72px auto 48px;
+    padding: 22px 72px;
+    border: 1px solid rgba(255,255,255,0.6);
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.26em;
+    text-transform: uppercase;
+    text-decoration: none;   /* overrides the .md-content a underline */
+    color: #fff;
+    transition: background 0.25s, border-color 0.25s, color 0.25s;
+  }
+  .md-content a.progress-cta:hover {
+    background: #fff;
+    color: #000;             /* the white-fill hover you like */
+    border-color: #fff;
+  }
+</style>
+<br>
+<a href="/progress/" class="progress-cta">See our progress →</a>
+
+<br><br><br>
 ## Our Values
 
 - **Precision** – Every component, from RF design to embedded firmware, is engineered to strict technical specifications required for space-grade reliability.  
