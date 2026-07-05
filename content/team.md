@@ -3,7 +3,7 @@
 ## Leadership
 
 <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 32px; margin: 40px 0;">
-  <img src="https://media.licdn.com/dms/image/v2/D4D03AQH2lEnWGnQ5Bw/profile-displayphoto-shrink_800_800/B4DZbn.mIaHsAg-/0/1747648678613?e=1782950400&v=beta&t=YwPyU-RR-gnkAB2fpdPtrx5JO-Phkg6IjSMjRLuWUkQ" alt="Thanos Papadopoulos" style="width: 200px; height: 200px; object-fit: cover; border-radius: 12px; flex-shrink: 0;" />
+  <img src="assets/images/thanos_papad.jpeg" alt="Thanos Papadopoulos" style="width: 200px; height: 200px; object-fit: cover; border-radius: 12px; flex-shrink: 0;" />
   <div style="flex: 1; min-width: 280px;">
     <h3 style="margin: 0 0 2px;">Thanos Papadopoulos</h3>
     <p style="margin: 0 0 16px; color: #666; font-size: 0.95em;">Co-Founder &amp; CEO</p>
@@ -16,7 +16,7 @@
 
 
 <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 32px; margin: 40px 0;">
-  <img src="https://media.licdn.com/dms/image/v2/D4D03AQGdJNFsdTF47w/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1701342244917?e=1782950400&v=beta&t=4t1TfWWBW3XDz15B4jaz-sckYRgXaSbeoM_rA6BTLDA" alt="Giorgos Pomportsis" style="width: 200px; height: 200px; object-fit: cover; border-radius: 12px; flex-shrink: 0;" />
+  <img src="assets/images/gpompo.jpeg" alt="Giorgos Pomportsis" style="width: 200px; height: 200px; object-fit: cover; border-radius: 12px; flex-shrink: 0;" />
   <div style="flex: 1; min-width: 280px;">
     <h3 style="margin: 0 0 2px;">Giorgos Pomportsis</h3>
     <p style="margin: 0 0 16px; color: #666; font-size: 0.95em;">Co-Founder</p>
@@ -27,7 +27,7 @@
 </div>
 
 <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 32px; margin: 40px 0;">
-  <img src="https://media.licdn.com/dms/image/v2/D4D03AQHWH8YtYGie0A/profile-displayphoto-crop_800_800/B4DZj8DB9_GsAI-/0/1756575311529?e=1782950400&v=beta&t=nAlRZHZHllVH4Gwy3vb00AN6JIbPqYqSZimvEH7N_C4" alt="George Vamvakidis" style="width: 200px; height: 200px; object-fit: cover; border-radius: 12px; flex-shrink: 0;" />
+  <img src="assets/images/gbmbk.jpeg" alt="George Vamvakidis" style="width: 200px; height: 200px; object-fit: cover; border-radius: 12px; flex-shrink: 0;" />
   <div style="flex: 1; min-width: 280px;">
     <h3 style="margin: 0 0 2px;">George Vamvakidis</h3>
     <p style="margin: 0 0 16px; color: #666; font-size: 0.95em;">Co-Founder</p>
