@@ -112,3 +112,54 @@ In the video below, SAT1 is reconnected to power, and the moment the ground stat
   </div>
   <figcaption style="margin: 14px 2px 0; font-size: 11px; letter-spacing: 0.06em; color: var(--muted);">SAT1 was connected as recording began, it takes a few seconds to start up.</figcaption>
 </figure>
+
+## File Management
+
+The service was extended with a file management control block, wired to both upload and download workflows.
+
+<figure style="margin: 44px 0 0;">
+  <div style="width: 60%; margin: 0 auto; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; background: var(--bg2);">
+    <img src="/assets/images/file_management_block.png" alt="File management control block" style="display: block; width: 100%; margin: 0;" />
+  </div>
+</figure>
+
+<div style="margin: 32px 0; border: 1px solid var(--line); border-radius: 14px; background: var(--bg2); overflow: hidden;">
+  <div style="display: flex; flex-wrap: wrap; gap: 20px; padding: 16px 22px; border-bottom: 1px solid var(--line);">
+    <span style="flex: 0 0 150px; color: var(--accent); font-weight: 500; font-size: 12px; letter-spacing: 0.08em; line-height: 1.7;">Satellite ID</span>
+    <span style="flex: 1; min-width: 220px; color: var(--dim); font-size: 13px; line-height: 1.7;">Chooses the target satellite, used for both uploads and downloads.</span>
+  </div>
+  <div style="display: flex; flex-wrap: wrap; gap: 20px; padding: 16px 22px; border-bottom: 1px solid var(--line);">
+    <span style="flex: 0 0 150px; color: var(--accent); font-weight: 500; font-size: 12px; letter-spacing: 0.08em; line-height: 1.7;">Filename</span>
+    <span style="flex: 1; min-width: 220px; color: var(--dim); font-size: 13px; line-height: 1.7;">The file to be downloaded from the satellite.</span>
+  </div>
+  <div style="display: flex; flex-wrap: wrap; gap: 20px; padding: 16px 22px;">
+    <span style="flex: 0 0 150px; color: var(--accent); font-weight: 500; font-size: 12px; letter-spacing: 0.08em; line-height: 1.7;">Choose File</span>
+    <span style="flex: 1; min-width: 220px; color: var(--dim); font-size: 13px; line-height: 1.7;">Selects the local file to be uploaded to the satellite, sent via the Upload button.</span>
+  </div>
+</div>
+
+Below, files are uploaded to two satellites in parallel.
+
+<figure style="margin: 44px 0 0;">
+  <div style="width: 60%; margin: 0 auto; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; background: var(--bg2);">
+    <img src="/assets/images/parallel_upload.png" alt="Parallel upload to two satellites" style="display: block; width: 100%; margin: 0;" />
+  </div>
+</figure>
+<br>
+The files are broken into chunks, uploaded or downloaded as distinct packets, and then they are either re-built in the database or the satellite respectively.
+
+<figure style="margin: 44px 0 0;">
+  <div style="width: 60%; margin: 0 auto; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; background: var(--bg2);">
+    <img src="/assets/images/file_spec_log.png" alt="File chunk transfer log" style="display: block; width: 100%; margin: 0;" />
+  </div>
+</figure>
+<br>
+In case a file is downloaded from the satellite the option button "SAVE" is shown where the user has the option to download the file from the database to their local device.
+
+To find out the contents of the satellite you can send the command file_list and the satellite reports back its contents.
+
+<figure style="margin: 44px 0 0;">
+  <div style="width: 60%; margin: 0 auto; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; background: var(--bg2);">
+    <img src="/assets/images/file_list_cmd.png" alt="file_list command output" style="display: block; width: 100%; margin: 0;" />
+  </div>
+</figure>

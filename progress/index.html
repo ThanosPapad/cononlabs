@@ -96,6 +96,60 @@
       color: var(--muted);
     }
     .md-content p:has(> em:only-child) em { font-style: normal; }
+
+    /* Click-to-enlarge affordance on every figure's media */
+    .md-content figure img,
+    .md-content figure video {
+      cursor: zoom-in;
+      -webkit-user-drag: none;
+      -webkit-touch-callout: none;
+      user-select: none;
+    }
+
+    /* Lightbox overlay */
+    .lightbox {
+      position: fixed;
+      inset: 0;
+      z-index: 300;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 5vh 5vw;
+      background: rgba(8, 8, 8, 0.92);
+      backdrop-filter: blur(6px);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.25s ease;
+    }
+    .lightbox.open {
+      opacity: 1;
+      visibility: visible;
+    }
+    .lightbox img,
+    .lightbox video {
+      display: block;
+      max-width: 100%;
+      max-height: 100%;
+      border-radius: 12px;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+    }
+    .lightbox-close {
+      position: absolute;
+      top: max(16px, env(safe-area-inset-top));
+      right: max(16px, env(safe-area-inset-right));
+      width: 44px;
+      height: 44px;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      background: var(--bg2);
+      color: var(--accent);
+      font-size: 22px;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -150,6 +204,11 @@
     </div>
   </footer>
 
+  <!-- Lightbox overlay: populated on click from the figure media below -->
+  <div class="lightbox" id="lightbox">
+    <button class="lightbox-close" id="lightboxClose" aria-label="Close">&times;</button>
+  </div>
+
   <!-- Self-contained script: renders the markdown, reveals the section,
        sets the year, and wires the mobile menu. No dependency on main.js. -->
   <script>
@@ -164,6 +223,39 @@
       });
     }
 
+    const lightbox = document.getElementById('lightbox');
+    const lightboxClose = document.getElementById('lightboxClose');
+
+    function openLightbox(source) {
+      const clone = source.cloneNode(true);
+      clone.removeAttribute('style');
+      if (clone.tagName === 'VIDEO') {
+        clone.removeAttribute('autoplay');
+        clone.removeAttribute('loop');
+        clone.controls = true;
+        clone.muted = false;
+        clone.load();
+      }
+      lightbox.querySelectorAll('img, video').forEach((el) => el.remove());
+      lightbox.appendChild(clone);
+      lightbox.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeLightbox() {
+      lightbox.classList.remove('open');
+      document.body.style.overflow = '';
+      lightbox.querySelectorAll('video').forEach((v) => v.pause());
+    }
+
+    lightboxClose.addEventListener('click', closeLightbox);
+    lightbox.addEventListener('click', (e) => {
+      if (e.target === lightbox) closeLightbox();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeLightbox();
+    });
+
     document.querySelectorAll('[data-md]').forEach(async (el) => {
       const section = el.closest('.content-section');
       try {
@@ -176,6 +268,9 @@
           v.muted = true;
           v.setAttribute('muted', '');
           v.play().catch(() => {});
+        });
+        el.querySelectorAll('figure img, figure video').forEach((media) => {
+          media.addEventListener('click', () => openLightbox(media));
         });
       } catch (e) {
         el.innerHTML = '<p>Couldn\u2019t load the content. Check that ' +
