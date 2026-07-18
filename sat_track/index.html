@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Satellite Tracker — Conon Labs</title>
+  <meta name="description" content="Interactive satellite tracker — paste a TLE to visualize any satellite's ground track in real time." />
+  <link rel="canonical" href="https://www.cononlabs.com/sat_track/" />
+
+  <meta property="og:type"        content="website" />
+  <meta property="og:url"         content="https://www.cononlabs.com/sat_track/" />
+  <meta property="og:title"       content="Satellite Tracker — Conon Labs" />
+  <meta property="og:description" content="Interactive satellite tracker. Paste a TLE to visualize any satellite's ground track in real time." />
+  <meta property="og:image"       content="https://www.cononlabs.com/assets/images/conon_logo_2.png" />
+  <meta property="og:site_name"   content="Conon Labs" />
+
+  <link rel="icon" type="image/x-icon"  href="/favicon.ico" />
+  <link rel="icon" type="image/svg+xml" href="/assets/images/favicon.svg" />
+  <link rel="apple-touch-icon"          href="/assets/images/favicon.png" />
+
+  <link rel="stylesheet" href="/assets/css/style.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    /* ── Full-screen app layout ──────────────────────────── */
+    body { overflow: hidden; }
+
+    .tracker-wrap {
+      position: fixed;
+      top: var(--nav-h);
+      left: 0; right: 0; bottom: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Main area: sidebar + map side by side */
+    .tracker-main {
+      flex: 1;
+      display: flex;
+      min-height: 0;   /* allow flex children to shrink below content height */
+    }
+
+    /* ── Sidebar ─────────────────────────────────────────── */
+    .tracker-sidebar {
+      width: 292px;
+      flex-shrink: 0;
+      background: var(--bg2);
+      border-right: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    .sb-title {
+      padding: 14px 16px 11px;
+      border-bottom: 1px solid var(--line);
+      font-family: var(--font-disp);
+      font-size: 16px;
+      letter-spacing: 0.14em;
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+
+    .sb-section {
+      padding: 12px 16px 14px;
+      border-bottom: 1px solid var(--line);
+      flex-shrink: 0;
+    }
+
+    .sb-label {
+      font-size: 8px;
+      font-weight: 500;
+      letter-spacing: 0.26em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .field-lbl {
+      display: block;
+      font-size: 8px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    /* Inputs */
+    .tle-area {
+      width: 100%;
+      background: #0d1117;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 2px;
+      color: #e6edf3;
+      font-family: var(--font-body);
+      font-size: 9px;
+      line-height: 1.6;
+      padding: 7px 8px;
+      resize: none;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .tle-area:focus { border-color: rgba(255,255,255,0.55); }
+
+    .txt-input {
+      flex: 1;
+      min-width: 0;
+      background: #0d1117;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 2px;
+      color: #e6edf3;
+      font-family: var(--font-body);
+      font-size: 9.5px;
+      padding: 6px 8px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .txt-input:focus { border-color: rgba(255,255,255,0.55); }
+
+    .step-input {
+      width: 56px;
+      background: #0d1117;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 2px;
+      color: #e6edf3;
+      font-family: var(--font-body);
+      font-size: 9.5px;
+      padding: 5px 7px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .step-input:focus { border-color: rgba(255,255,255,0.55); }
+
+    /* Buttons — match site nav-cta style */
+    .btn {
+      font-family: var(--font-body);
+      font-size: 9px;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      border: 1px solid rgba(255,255,255,0.6);
+      border-radius: 0;
+      background: transparent;
+      color: var(--accent);
+      padding: 6px 10px;
+      cursor: pointer;
+      transition: background 0.25s, border-color 0.25s, color 0.25s;
+      white-space: nowrap;
+    }
+    .btn:hover {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #000;
+    }
+
+    /* btn-primary is visually identical to .btn — white ghost, inverts on hover */
+    .btn-primary { }
+
+    .btn-stop { background: #f85149; border-color: #f85149; color: #fff; }
+    .btn-stop:hover { background: #ff7b72; border-color: #ff7b72; color: #fff; }
+
+    /* Layout helpers */
+    .row   { display: flex; gap: 6px; align-items: center; }
+    .flex1 { flex: 1; min-width: 0; }
+    .mt8   { margin-top: 8px; }
+    .mt10  { margin-top: 10px; }
+
+    /* Position readout */
+    .pos-grid {
+      background: #0d1117;
+      border-radius: 2px;
+      padding: 4px 10px;
+    }
+    .pos-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 5px 0;
+    }
+    .pos-row + .pos-row { border-top: 1px solid rgba(255,255,255,0.04); }
+    .pos-key {
+      font-size: 8px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--muted);
+      white-space: nowrap;
+      margin-right: 8px;
+    }
+    .pos-val {
+      font-size: 11px;
+      font-weight: 500;
+      color: #3fb950;
+      letter-spacing: 0.04em;
+      text-align: right;
+      user-select: all;   /* makes it trivial to copy */
+    }
+
+    /* Minimap */
+    .minimap-zoom {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 7px;
+    }
+    .zoom-lbl {
+      font-size: 8px;
+      letter-spacing: 0.15em;
+      color: var(--muted);
+      margin-right: auto;
+    }
+    .minimap-wrap { position: relative; }
+    #minimap {
+      width: 100%;
+      height: 178px;
+      border-radius: 2px;
+      border: 1px solid rgba(255,255,255,0.07);
+    }
+    .minimap-xhair {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 500;
+    }
+    .minimap-xhair::before {
+      content: '';
+      position: absolute;
+      top: 50%; left: calc(50% - 12px);
+      width: 24px; height: 1px;
+      background: #f0c040;
+      transform: translateY(-50%);
+    }
+    .minimap-xhair::after {
+      content: '';
+      position: absolute;
+      left: 50%; top: calc(50% - 12px);
+      width: 1px; height: 24px;
+      background: #f0c040;
+      transform: translateX(-50%);
+    }
+
+    /* Status bar */
+    .sb-status {
+      margin-top: auto;
+      padding: 9px 16px 11px;
+      font-size: 8.5px;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      border-top: 1px solid var(--line);
+      flex-shrink: 0;
+    }
+
+    /* ── Main map ─────────────────────────────────────────── */
+    .tracker-map { flex: 1; position: relative; min-width: 0; }
+    #map { width: 100%; height: 100%; }
+
+    /* ── Bottom time-transport bar ───────────────────────── */
+    .time-bar {
+      flex-shrink: 0;
+      height: 54px;
+      background: var(--bg2);
+      border-top: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 0 16px;
+      overflow-x: auto;
+    }
+    .time-bar-sep {
+      width: 1px;
+      height: 24px;
+      background: var(--line);
+      flex-shrink: 0;
+      margin: 0 4px;
+    }
+    .time-lbl {
+      font-size: 8px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    /* ── Dark Leaflet controls ────────────────────────────── */
+    .leaflet-control-zoom a {
+      background: #0f0f0f !important;
+      border-color: rgba(255,255,255,0.1) !important;
+      color: #e6edf3 !important;
+    }
+    .leaflet-control-zoom a:hover { background: #1c2128 !important; }
+    .leaflet-bar { border: 1px solid rgba(255,255,255,0.1) !important; box-shadow: none !important; }
+    .leaflet-control-attribution {
+      background: rgba(8,8,8,0.72) !important;
+      color: rgba(255,255,255,0.28) !important;
+      font-size: 8px !important;
+    }
+    .leaflet-control-attribution a { color: rgba(255,255,255,0.38) !important; }
+
+    /* Satellite tooltip */
+    .sat-tip {
+      background: rgba(13,17,23,0.92) !important;
+      border: 1px solid #58a6ff !important;
+      color: #f0c040 !important;
+      font-family: var(--font-body) !important;
+      font-size: 9.5px !important;
+      border-radius: 3px !important;
+      padding: 4px 9px !important;
+      box-shadow: none !important;
+    }
+    .sat-tip::before { border-top-color: #58a6ff !important; }
+
+    /* ── Responsive ──────────────────────────────────────── */
+    @media (max-width: 680px) {
+      body { overflow: auto; }
+      .tracker-wrap {
+        position: static;
+        margin-top: var(--nav-h);
+        min-height: calc(100vh - var(--nav-h));
+      }
+      .tracker-main { flex-direction: column; }
+      .tracker-sidebar { width: 100%; max-height: 360px; }
+      .tracker-map { height: 56vw; min-height: 260px; }
+      .time-bar { height: auto; flex-wrap: wrap; padding: 10px 12px; gap: 6px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ═══ NAV ═══ -->
+  <nav id="navbar" class="scrolled">
+    <div class="nav-inner">
+      <a href="/" class="nav-logo-link">
+        <img src="/assets/images/conon_logo_2.png" alt="Conon Labs" class="nav-logo" />
+      </a>
+      <ul class="nav-links">
+        <li><a href="/#about"    class="nav-link">About</a></li>
+        <li><a href="/#products" class="nav-link">Products</a></li>
+        <li><a href="/#services" class="nav-link">Services</a></li>
+        <li><a href="/#team"     class="nav-link">Team</a></li>
+        <li><a href="/#research" class="nav-link">Research</a></li>
+        <li><a href="/#contact"  class="nav-link">Contact</a></li>
+        <li><a href="/progress/"  class="nav-cta">Progress</a></li>
+      </ul>
+      <button class="hamburger" id="hamburger" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Mobile drawer -->
+  <div class="mobile-menu" id="mobileMenu">
+    <a href="/#about"    class="mob-link">About</a>
+    <a href="/#products" class="mob-link">Products</a>
+    <a href="/#services" class="mob-link">Services</a>
+    <a href="/#team"     class="mob-link">Team</a>
+    <a href="/#research" class="mob-link">Research</a>
+    <a href="/#contact"  class="mob-link">Contact</a>
+    <a href="/progress/" class="mob-link">Progress</a>
+  </div>
+
+  <!-- ═══ TRACKER ═══ -->
+  <div class="tracker-wrap">
+
+    <!-- ── Main content: sidebar + map ──────────────────── -->
+    <div class="tracker-main">
+
+      <!-- Sidebar -->
+      <aside class="tracker-sidebar">
+
+        <div class="sb-title">Satellite Tracker</div>
+
+        <!-- TLE Input -->
+        <div class="sb-section">
+          <div class="sb-label">TLE Data</div>
+          <span class="field-lbl">Line 1</span>
+          <textarea id="tle1" class="tle-area" rows="2"
+            placeholder="1 25544U 98067A   24001.50000000  .00016717  00000-0  10270-3 0  9993"></textarea>
+          <span class="field-lbl mt8">Line 2</span>
+          <textarea id="tle2" class="tle-area" rows="2"
+            placeholder="2 25544  51.6400 208.9163 0006317  86.9995 273.1846 15.49815077443270"></textarea>
+          <div class="row mt8">
+            <button class="btn btn-primary flex1" onclick="onPropagate()">Propagate</button>
+            <button class="btn" onclick="onClear()">Clear</button>
+          </div>
+          <p style="font-size:8px;color:var(--muted);margin-top:8px;line-height:1.5;">
+            Get TLEs from
+            <a href="https://celestrak.org/SOCRATES/" target="_blank" rel="noopener"
+               style="color:var(--muted);text-underline-offset:2px;">celestrak.org</a>
+          </p>
+        </div>
+
+        <!-- Position -->
+        <div class="sb-section">
+          <div class="sb-label">Position</div>
+          <div class="pos-grid">
+            <div class="pos-row">
+              <span class="pos-key">Lat / Lon</span>
+              <span class="pos-val" id="pos-latlon">&#x2014;</span>
+            </div>
+            <div class="pos-row">
+              <span class="pos-key">Altitude</span>
+              <span class="pos-val" id="pos-alt">&#x2014;</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Ground View -->
+        <div class="sb-section">
+          <div class="sb-label">Ground View</div>
+          <div class="minimap-zoom">
+            <span class="zoom-lbl" id="zoom-lbl">Zoom: 8</span>
+            <button class="btn" onclick="zoomMiniOut()">&#x2212;</button>
+            <button class="btn" onclick="zoomMiniIn()">&#xFF0B;</button>
+          </div>
+          <div class="minimap-wrap">
+            <div id="minimap"></div>
+            <div class="minimap-xhair"></div>
+          </div>
+        </div>
+
+        <!-- Status -->
+        <div class="sb-status" id="status">Load a TLE and click Propagate</div>
+      </aside>
+
+      <!-- Main map -->
+      <div class="tracker-map">
+        <div id="map"></div>
+      </div>
+
+    </div><!-- /.tracker-main -->
+
+    <!-- ── Bottom time-transport bar ────────────────────── -->
+    <div class="time-bar">
+
+      <!-- Transport controls -->
+      <button class="btn" onclick="step(-10)" title="Back 10 steps">&#9664;&#9664;</button>
+      <button class="btn" onclick="step(-1)"  title="Back 1 step">&#9664;</button>
+      <button id="play-btn" class="btn btn-primary" onclick="togglePlay()">&#9654;&nbsp; Play</button>
+      <button class="btn" onclick="step(1)"   title="Forward 1 step">&#9654;</button>
+      <button class="btn" onclick="step(10)"  title="Forward 10 steps">&#9654;&#9654;</button>
+
+      <div class="time-bar-sep"></div>
+
+      <!-- Time jump -->
+      <span class="time-lbl">UTC</span>
+      <input id="time-input" type="text" class="txt-input"
+        style="width:158px;flex:none;"
+        placeholder="YYYY-MM-DD HH:MM:SS" />
+      <button class="btn" onclick="onGoto()">Go</button>
+
+      <div class="time-bar-sep"></div>
+
+      <!-- Step size -->
+      <span class="time-lbl">Step</span>
+      <input id="step-size" type="number" class="step-input" value="60" min="1" max="86400" />
+      <button class="btn" onclick="setStep(60)">1 m</button>
+      <button class="btn" onclick="setStep(600)">10 m</button>
+      <button class="btn" onclick="setStep(3600)">1 h</button>
+
+    </div><!-- /.time-bar -->
+
+  </div><!-- /.tracker-wrap -->
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/satellite.js@4.1.3/dist/satellite.min.js"></script>
+  <script>
+    // ── Mobile hamburger ─────────────────────────────────
+    const burger = document.getElementById('hamburger');
+    const mobMenu = document.getElementById('mobileMenu');
+    if (burger) {
+      burger.addEventListener('click', () => {
+        burger.classList.toggle('open');
+        mobMenu.classList.toggle('open');
+      });
+    }
+    document.querySelectorAll('.mob-link').forEach(a =>
+      a.addEventListener('click', () => {
+        burger.classList.remove('open');
+        mobMenu.classList.remove('open');
+      })
+    );
+
+    // ── State ────────────────────────────────────────────
+    let satrec       = null;
+    let currentDt    = new Date();
+    let playInterval = null;
+    let miniZoom     = 8;
+
+    let orbitLines  = [];
+    let satMarker   = null;
+    let footprint   = null;
+    let miniMarker  = null;
+    let nightLayer  = null;
+
+    // ── Initialise maps ──────────────────────────────────
+    const map = L.map('map', {
+      center: [20, 0],
+      zoom: 2,
+      minZoom: 1,
+      worldCopyJump: true,
+      zoomControl: true,
+    });
+
+    L.tileLayer(
+      'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+      {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 19,
+      }
+    ).addTo(map);
+
+    const minimap = L.map('minimap', {
+      center: [20, 0],
+      zoom: miniZoom,
+      zoomControl: false,
+      attributionControl: false,
+      dragging: false,
+      scrollWheelZoom: false,
+      doubleClickZoom: false,
+      touchZoom: false,
+      boxZoom: false,
+      keyboard: false,
+    });
+
+    L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      { maxZoom: 18, attribution: '&copy; Esri' }
+    ).addTo(minimap);
+
+    // ── Utilities ────────────────────────────────────────
+    function setStatus(msg) {
+      document.getElementById('status').textContent = msg;
+    }
+
+    function formatDt(dt) {
+      return dt.toISOString().replace('T', ' ').slice(0, 19);
+    }
+
+    function updateTimeInput() {
+      document.getElementById('time-input').value = formatDt(currentDt);
+    }
+
+    // ── Day / night terminator ───────────────────────────
+    function getSolarPosition(dt) {
+      const J2000   = Date.UTC(2000, 0, 1, 12, 0, 0);
+      const d       = (dt.getTime() - J2000) / 86400000;
+      const L       = (280.46 + 0.9856474 * d) % 360;
+      const g       = ((357.528 + 0.9856003 * d) % 360) * Math.PI / 180;
+      const lambda  = (L + 1.915 * Math.sin(g) + 0.020 * Math.sin(2 * g)) * Math.PI / 180;
+      const eps     = (23.439 - 0.0000004 * d) * Math.PI / 180;
+      const dec     = Math.asin(Math.sin(eps) * Math.sin(lambda));
+      const ra      = Math.atan2(Math.cos(eps) * Math.sin(lambda), Math.cos(lambda));
+      const gmst    = ((280.46061837 + 360.98564736629 * d) % 360) * Math.PI / 180;
+      const lon     = ((ra - gmst) * 180 / Math.PI + 180) % 360 - 180;
+      return { lat: dec * 180 / Math.PI, lon };
+    }
+
+    function buildNightPolygon(dt) {
+      const { lat: sLat, lon: sLon } = getSolarPosition(dt);
+      const lR = sLat * Math.PI / 180;
+      const oR = sLon * Math.PI / 180;
+
+      // Sun unit vector (ECI-like, ignoring time dependence for geometry)
+      const sx = Math.cos(lR) * Math.cos(oR);
+      const sy = Math.cos(lR) * Math.sin(oR);
+      const sz = Math.sin(lR);
+
+      // Two vectors perpendicular to the sun direction
+      const mag = Math.hypot(sx, sy) || 1e-10;
+      const e1x = -sy / mag, e1y = sx / mag, e1z = 0;
+      const e2x = sy * e1z - sz * e1y;
+      const e2y = sz * e1x - sx * e1z;
+      const e2z = sx * e1y - sy * e1x;
+
+      // 360 points on the terminator great-circle
+      const pts = [];
+      for (let i = 0; i < 360; i++) {
+        const a  = i * Math.PI / 180;
+        const px = e1x * Math.cos(a) + e2x * Math.sin(a);
+        const py = e1y * Math.cos(a) + e2y * Math.sin(a);
+        const pz = e1z * Math.cos(a) + e2z * Math.sin(a);
+        pts.push({
+          lat: Math.asin(Math.max(-1, Math.min(1, pz))) * 180 / Math.PI,
+          lon: Math.atan2(py, px) * 180 / Math.PI,
+        });
+      }
+
+      // Sort by longitude so the polygon traces west → east on the flat map
+      pts.sort((a, b) => a.lon - b.lon);
+
+      // Close through the night pole
+      const pole = sLat >= 0 ? -90 : 90;
+      const poly = pts.map(p => [p.lat, p.lon]);
+      poly.push([pole, 180], [pole, -180]);
+      return poly;
+    }
+
+    function redrawNight() {
+      if (nightLayer) { map.removeLayer(nightLayer); nightLayer = null; }
+      nightLayer = L.polygon(buildNightPolygon(currentDt), {
+        color: 'none',
+        fillColor: '#000033',
+        fillOpacity: 0.32,
+        pane: 'overlayPane',
+        interactive: false,
+      }).addTo(map);
+    }
+
+    // ── Propagation ──────────────────────────────────────
+    function getPosition(dt) {
+      const pv = satellite.propagate(satrec, dt);
+      if (!pv || !pv.position) throw new Error('Propagation returned no position');
+      const gmst = satellite.gstime(dt);
+      const gd   = satellite.eciToGeodetic(pv.position, gmst);
+      return {
+        lat: satellite.degreesLat(gd.latitude),
+        lon: satellite.degreesLong(gd.longitude),
+        alt: gd.height,
+      };
+    }
+
+    function buildOrbitTrack(dt) {
+      const periodMin = (2 * Math.PI) / satrec.no;
+      const halfMs    = (periodMin / 2) * 60000;
+      const start     = new Date(dt.getTime() - halfMs);
+      const pts = [];
+      for (let i = 0; i <= 360; i++) {
+        const t = new Date(start.getTime() + (periodMin * i / 360) * 60000);
+        try { pts.push(getPosition(t)); } catch (_) {}
+      }
+      return pts;
+    }
+
+    function splitAntimeridian(pts) {
+      if (!pts.length) return [];
+      const segs = [];
+      let cur = [[pts[0].lat, pts[0].lon]];
+      for (let i = 1; i < pts.length; i++) {
+        if (Math.abs(pts[i].lon - pts[i - 1].lon) > 180) {
+          segs.push(cur); cur = [];
+        }
+        cur.push([pts[i].lat, pts[i].lon]);
+      }
+      segs.push(cur);
+      return segs;
+    }
+
+    function drawOrbit(pts) {
+      orbitLines.forEach(l => map.removeLayer(l));
+      orbitLines = [];
+      splitAntimeridian(pts).forEach(seg => {
+        if (seg.length > 1) {
+          orbitLines.push(
+            L.polyline(seg, { color: '#58a6ff', weight: 1.5, opacity: 0.55 }).addTo(map)
+          );
+        }
+      });
+    }
+
+    // ── Map refresh (position + night layer, orbit unchanged) ──
+    function refreshPosition() {
+      if (!satrec) return;
+      let pos;
+      try { pos = getPosition(currentDt); }
+      catch (e) { setStatus('Position error: ' + e.message); return; }
+
+      const { lat, lon, alt } = pos;
+
+      // Coordinates — single copyable line
+      document.getElementById('pos-latlon').textContent =
+        Math.abs(lat).toFixed(4) + '° ' + (lat >= 0 ? 'N' : 'S') + ',  ' +
+        Math.abs(lon).toFixed(4) + '° ' + (lon >= 0 ? 'E' : 'W');
+      document.getElementById('pos-alt').textContent = alt.toFixed(1) + ' km';
+
+      // Night layer first so orbit/dot render on top
+      redrawNight();
+
+      // Satellite dot
+      if (satMarker) map.removeLayer(satMarker);
+      satMarker = L.circleMarker([lat, lon], {
+        radius: 6,
+        fillColor: '#f0c040',
+        color: '#0d1117',
+        weight: 2,
+        fillOpacity: 1,
+        pane: 'markerPane',
+      }).addTo(map).bindTooltip(
+        Math.abs(lat).toFixed(2) + '°' + (lat >= 0 ? 'N' : 'S') +
+        '  ' + Math.abs(lon).toFixed(2) + '°' + (lon >= 0 ? 'E' : 'W') +
+        '<br>Alt:&nbsp;' + alt.toFixed(0) + ' km',
+        { permanent: false, className: 'sat-tip', direction: 'top', offset: [0, -10] }
+      );
+
+      // Visibility footprint
+      if (footprint) map.removeLayer(footprint);
+      if (alt > 0) {
+        const angle   = Math.acos(Math.min(1, 6378.137 / (6378.137 + alt)));
+        const radiusM = 6378137 * angle;
+        footprint = L.circle([lat, lon], {
+          radius: radiusM,
+          color: '#f0c040',
+          weight: 0.8,
+          fillOpacity: 0.06,
+          fillColor: '#f0c040',
+          dashArray: '4 6',
+          pane: 'overlayPane',
+        }).addTo(map);
+      }
+
+      // Ground-view minimap
+      minimap.setView([lat, lon], miniZoom, { animate: true, duration: 0.25 });
+      if (miniMarker) minimap.removeLayer(miniMarker);
+      miniMarker = L.circleMarker([lat, lon], {
+        radius: 6,
+        fillColor: '#f0c040',
+        color: '#fff',
+        weight: 2,
+        fillOpacity: 1,
+      }).addTo(minimap);
+
+      setStatus('UTC  ' + formatDt(currentDt));
+    }
+
+    // ── Controls ─────────────────────────────────────────
+    function onPropagate() {
+      const l1 = document.getElementById('tle1').value.trim().replace(/[\r\n]+/g, '');
+      const l2 = document.getElementById('tle2').value.trim().replace(/[\r\n]+/g, '');
+      if (!l1 || !l2) { alert('Enter both TLE lines.'); return; }
+      try {
+        satrec = satellite.twoline2satrec(l1, l2);
+        setStatus('Computing orbit track…');
+        const pts = buildOrbitTrack(currentDt);
+        drawOrbit(pts);
+        refreshPosition();
+        setStatus('Orbit loaded · ' + pts.length + ' points');
+      } catch (e) {
+        alert('Propagation error: ' + e.message);
+        setStatus('Error — check TLE format');
+      }
+    }
+
+    function onClear() {
+      if (playInterval) { clearInterval(playInterval); playInterval = null; resetPlayBtn(); }
+      satrec = null;
+      document.getElementById('tle1').value = '';
+      document.getElementById('tle2').value = '';
+      document.getElementById('pos-latlon').textContent = '—';
+      document.getElementById('pos-alt').textContent = '—';
+      orbitLines.forEach(l => map.removeLayer(l)); orbitLines = [];
+      if (satMarker)  { map.removeLayer(satMarker);      satMarker  = null; }
+      if (footprint)  { map.removeLayer(footprint);      footprint  = null; }
+      if (nightLayer) { map.removeLayer(nightLayer);     nightLayer = null; }
+      if (miniMarker) { minimap.removeLayer(miniMarker); miniMarker = null; }
+      setStatus('Load a TLE and click Propagate');
+    }
+
+    function step(mult) {
+      const secs = parseInt(document.getElementById('step-size').value) || 60;
+      currentDt = new Date(currentDt.getTime() + secs * mult * 1000);
+      updateTimeInput();
+      if (satrec) refreshPosition();
+      else redrawNight();
+    }
+
+    function setStep(s) {
+      document.getElementById('step-size').value = s;
+    }
+
+    function onGoto() {
+      const raw = document.getElementById('time-input').value.trim();
+      const iso = raw.includes('T') ? raw : raw.replace(' ', 'T');
+      const d = new Date(iso.endsWith('Z') ? iso : iso + 'Z');
+      if (isNaN(d.getTime())) { alert('Use format: YYYY-MM-DD HH:MM:SS'); return; }
+      currentDt = d;
+      updateTimeInput();
+      if (satrec) {
+        setStatus('Recomputing orbit…');
+        const pts = buildOrbitTrack(currentDt);
+        drawOrbit(pts);
+        refreshPosition();
+      } else {
+        redrawNight();
+      }
+    }
+
+    function resetPlayBtn() {
+      const btn = document.getElementById('play-btn');
+      btn.innerHTML = '&#9654;&nbsp; Play';
+      btn.className = 'btn btn-primary';
+    }
+
+    function togglePlay() {
+      if (playInterval) {
+        clearInterval(playInterval);
+        playInterval = null;
+        resetPlayBtn();
+      } else {
+        const btn = document.getElementById('play-btn');
+        btn.innerHTML = '&#9632;&nbsp; Stop';
+        btn.className = 'btn btn-stop';
+        playInterval = setInterval(() => step(1), 100);
+      }
+    }
+
+    function zoomMiniIn() {
+      if (miniZoom < 17) {
+        miniZoom++;
+        minimap.setZoom(miniZoom);
+        document.getElementById('zoom-lbl').textContent = 'Zoom: ' + miniZoom;
+      }
+    }
+
+    function zoomMiniOut() {
+      if (miniZoom > 2) {
+        miniZoom--;
+        minimap.setZoom(miniZoom);
+        document.getElementById('zoom-lbl').textContent = 'Zoom: ' + miniZoom;
+      }
+    }
+
+    // Enter on time input triggers Goto
+    document.getElementById('time-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') onGoto();
+    });
+
+    // Initialise: show time and draw initial night layer
+    updateTimeInput();
+    redrawNight();
+  </script>
+</body>
+</html>
