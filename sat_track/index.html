@@ -421,6 +421,25 @@
           </div>
         </div>
 
+        <!-- Weather -->
+        <div class="sb-section" id="wx-section">
+          <div class="sb-label">Weather at Sub-Sat Point <span style="font-size:7px;letter-spacing:0.1em;">(±1 h resolution)</span></div>
+          <div class="pos-grid">
+            <div class="pos-row">
+              <span class="pos-key">Cloud Cover</span>
+              <span class="pos-val" id="wx-cloud">&#x2014;</span>
+            </div>
+            <div class="pos-row">
+              <span class="pos-key">Temperature</span>
+              <span class="pos-val" id="wx-temp">&#x2014;</span>
+            </div>
+            <div class="pos-row">
+              <span class="pos-key">Precipitation</span>
+              <span class="pos-val" id="wx-precip">&#x2014;</span>
+            </div>
+          </div>
+        </div>
+
         <!-- Status -->
         <div class="sb-status" id="status">Load a TLE and click Propagate</div>
       </aside>
@@ -444,12 +463,21 @@
 
       <div class="time-bar-sep"></div>
 
-      <!-- Time jump -->
+      <!-- Time jump — UTC -->
       <span class="time-lbl">UTC</span>
       <input id="time-input" type="text" class="txt-input"
         style="width:158px;flex:none;"
         placeholder="YYYY-MM-DD HH:MM:SS" />
       <button class="btn" onclick="onGoto()">Go</button>
+
+      <div class="time-bar-sep"></div>
+
+      <!-- Time jump — UNIX -->
+      <span class="time-lbl">UNIX</span>
+      <input id="unix-input" type="number" class="txt-input"
+        style="width:110px;flex:none;"
+        placeholder="1720000000" />
+      <button class="btn" onclick="onGotoUnix()">Go</button>
 
       <div class="time-bar-sep"></div>
 
@@ -542,6 +570,7 @@
 
     function updateTimeInput() {
       document.getElementById('time-input').value = formatDt(currentDt);
+      document.getElementById('unix-input').value = Math.floor(currentDt.getTime() / 1000);
     }
 
     // ── Day / night terminator ───────────────────────────
@@ -723,6 +752,8 @@
       }).addTo(minimap);
 
       setStatus('UTC  ' + formatDt(currentDt));
+
+      fetchWeather(lat, lon, currentDt);
     }
 
     // ── Controls ─────────────────────────────────────────
@@ -755,6 +786,8 @@
       if (footprint)  { map.removeLayer(footprint);      footprint  = null; }
       if (nightLayer) { map.removeLayer(nightLayer);     nightLayer = null; }
       if (miniMarker) { minimap.removeLayer(miniMarker); miniMarker = null; }
+      clearTimeout(wxDebounceTimer);
+      resetWeather();
       setStatus('Load a TLE and click Propagate');
     }
 
@@ -775,6 +808,23 @@
       const iso = raw.includes('T') ? raw : raw.replace(' ', 'T');
       const d = new Date(iso.endsWith('Z') ? iso : iso + 'Z');
       if (isNaN(d.getTime())) { alert('Use format: YYYY-MM-DD HH:MM:SS'); return; }
+      currentDt = d;
+      updateTimeInput();
+      if (satrec) {
+        setStatus('Recomputing orbit…');
+        const pts = buildOrbitTrack(currentDt);
+        drawOrbit(pts);
+        refreshPosition();
+      } else {
+        redrawNight();
+      }
+    }
+
+    function onGotoUnix() {
+      const val = parseInt(document.getElementById('unix-input').value.trim(), 10);
+      if (isNaN(val)) { alert('Enter a valid UNIX timestamp (seconds).'); return; }
+      const d = new Date(val * 1000);
+      if (isNaN(d.getTime())) { alert('Invalid UNIX timestamp.'); return; }
       currentDt = d;
       updateTimeInput();
       if (satrec) {
@@ -822,9 +872,64 @@
       }
     }
 
+    // ── Weather ──────────────────────────────────────────
+    let wxDebounceTimer = null;
+
+    function setWeatherUnavailable(msg = 'No weather data') {
+      ['wx-cloud', 'wx-temp', 'wx-precip'].forEach(id =>
+        document.getElementById(id).textContent = msg);
+    }
+
+    function resetWeather() {
+      ['wx-cloud', 'wx-temp', 'wx-precip'].forEach(id =>
+        document.getElementById(id).textContent = '—');
+    }
+
+    async function fetchWeather(lat, lon, dt) {
+      clearTimeout(wxDebounceTimer);
+      wxDebounceTimer = setTimeout(async () => {
+        const now      = new Date();
+        const daysDiff = (dt - now) / 86400000;
+
+        if (daysDiff > 16) {
+          setWeatherUnavailable('Out of forecast range');
+          return;
+        }
+
+        const dateStr = dt.toISOString().slice(0, 10);
+        const base    = daysDiff < -7
+          ? 'https://archive-api.open-meteo.com/v1/archive'
+          : 'https://api.open-meteo.com/v1/forecast';
+        const url = `${base}?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&hourly=temperature_2m,precipitation,cloud_cover&start_date=${dateStr}&end_date=${dateStr}&timezone=UTC`;
+
+        try {
+          const r = await fetch(url);
+          if (!r.ok) { setWeatherUnavailable('No weather data'); return; }
+          const d = await r.json();
+          if (!d.hourly) { setWeatherUnavailable('No weather data'); return; }
+
+          const h     = dt.getUTCHours();
+          const cloud = d.hourly.cloud_cover[h];
+          const temp  = d.hourly.temperature_2m[h];
+          const prec  = d.hourly.precipitation[h];
+
+          document.getElementById('wx-cloud').textContent  = cloud != null ? cloud + ' %'    : '—';
+          document.getElementById('wx-temp').textContent   = temp  != null ? temp  + ' °C' : '—';
+          document.getElementById('wx-precip').textContent = prec  != null ? prec  + ' mm/h'  : '—';
+        } catch (_) {
+          setWeatherUnavailable('No weather data');
+        }
+      }, 800);
+    }
+
     // Enter on time input triggers Goto
     document.getElementById('time-input').addEventListener('keydown', e => {
       if (e.key === 'Enter') onGoto();
+    });
+
+    // Enter on UNIX input triggers GotoUnix
+    document.getElementById('unix-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') onGotoUnix();
     });
 
     // Initialise: show time and draw initial night layer
