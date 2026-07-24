@@ -3,11 +3,13 @@
 ═══════════════════════════════════════════════════════════ */
 
 /* ── Year ──────────────────────────────────────────────── */
-document.getElementById('year').textContent = new Date().getFullYear();
+const yearEl = document.getElementById('year');
+if (yearEl) yearEl.textContent = new Date().getFullYear();
 
 /* ── Starfield Canvas ──────────────────────────────────── */
 (function initStarfield() {
   const canvas = document.getElementById('starfield');
+  if (!canvas) return;
   const ctx    = canvas.getContext('2d');
   let stars    = [];
   let W, H;
