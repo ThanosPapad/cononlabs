@@ -72,7 +72,13 @@
         <li><a href="#research" class="nav-link" data-section="research">Research</a></li>
         <li><a href="#contact" class="nav-link" data-section="contact">Contact</a></li>
         <li><a href="/progress/"  class="nav-cta">Progress</a></li>
-        <li><a href="/sat_track/" class="nav-cta">Sat Track</a></li>
+        <li class="nav-dropdown">
+          <button class="nav-cta nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Apps</button>
+          <div class="nav-dropdown-menu">
+            <a href="/sat_track/" class="nav-dropdown-link">Sat Track</a>
+            <a href="/gs_calc/" class="nav-dropdown-link">GS Calc</a>
+          </div>
+        </li>
       </ul>
       <button class="hamburger" id="hamburger" aria-label="Menu">
         <span></span><span></span><span></span>
@@ -89,7 +95,9 @@
     <a href="#research" class="mob-link" data-section="research">Research</a>
     <a href="#contact" class="mob-link" data-section="contact">Contact</a>
     <a href="/progress/"  class="mob-link">Progress</a>
-    <a href="/sat_track/" class="nav-cta">Sat Track</a>
+    <span class="mob-apps-label">Apps</span>
+    <a href="/sat_track/" class="mob-link">Sat Track</a>
+    <a href="/gs_calc/"   class="mob-link">GS Calc</a>
   </div>
 
   <!-- ═══════════════════════════════════════════

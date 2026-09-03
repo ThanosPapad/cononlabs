@@ -75,6 +75,35 @@ document.querySelectorAll('.mob-link').forEach(link => {
   });
 });
 
+/* ── Apps dropdown ───────────────────────────────────────  */
+document.querySelectorAll('.nav-dropdown').forEach(dropdown => {
+  const trigger = dropdown.querySelector('.nav-dropdown-trigger');
+  if (!trigger) return;
+
+  function closeDropdown() {
+    dropdown.classList.remove('open');
+    trigger.setAttribute('aria-expanded', 'false');
+  }
+
+  trigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const open = dropdown.classList.toggle('open');
+    trigger.setAttribute('aria-expanded', String(open));
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!dropdown.contains(e.target)) closeDropdown();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeDropdown();
+  });
+
+  dropdown.querySelectorAll('.nav-dropdown-link').forEach(link => {
+    link.addEventListener('click', closeDropdown);
+  });
+});
+
 /* ── Active nav highlight on scroll ─────────────────────── */
 const sections  = document.querySelectorAll('.content-section');
 const navLinks  = document.querySelectorAll('.nav-link');

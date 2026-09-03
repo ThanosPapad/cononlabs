@@ -497,6 +497,13 @@
         <li><a href="/#research" class="nav-link">Research</a></li>
         <li><a href="/#contact"  class="nav-link">Contact</a></li>
         <li><a href="/progress/"  class="nav-cta">Progress</a></li>
+        <li class="nav-dropdown">
+          <button class="nav-cta nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Apps</button>
+          <div class="nav-dropdown-menu">
+            <a href="/sat_track/" class="nav-dropdown-link">Sat Track</a>
+            <a href="/gs_calc/" class="nav-dropdown-link">GS Calc</a>
+          </div>
+        </li>
       </ul>
       <button class="hamburger" id="hamburger" aria-label="Menu">
         <span></span><span></span><span></span>
@@ -513,6 +520,9 @@
     <a href="/#research" class="mob-link">Research</a>
     <a href="/#contact"  class="mob-link">Contact</a>
     <a href="/progress/" class="mob-link">Progress</a>
+    <span class="mob-apps-label">Apps</span>
+    <a href="/sat_track/" class="mob-link">Sat Track</a>
+    <a href="/gs_calc/"   class="mob-link">GS Calc</a>
   </div>
 
   <!-- ═══ TRACKER ═══ -->
@@ -725,11 +735,10 @@
     });
 
     L.tileLayer(
-      'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+      'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
       {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
-        subdomains: 'abcd',
-        maxZoom: 19,
+        attribution: '&copy; Esri',
+        maxZoom: 16,
       }
     ).addTo(map);
 
@@ -1024,8 +1033,12 @@
       const secs = parseInt(document.getElementById('step-size').value) || 60;
       currentDt = new Date(currentDt.getTime() + secs * mult * 1000);
       updateTimeInput();
-      if (satrec) refreshPosition();
-      else redrawNight();
+      if (satrec) {
+        drawOrbit(buildOrbitTrack(currentDt));
+        refreshPosition();
+      } else {
+        redrawNight();
+      }
     }
 
     function setStep(s) {

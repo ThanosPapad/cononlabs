@@ -167,7 +167,13 @@
         <li><a href="/#team"     class="nav-link">Team</a></li>
         <li><a href="/#research" class="nav-link">Research</a></li>
         <li><a href="/#contact"  class="nav-link">Contact</a></li>
-        <li><a href="/sat_track/" class="nav-cta">Sat Track</a></li>
+        <li class="nav-dropdown">
+          <button class="nav-cta nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Apps</button>
+          <div class="nav-dropdown-menu">
+            <a href="/sat_track/" class="nav-dropdown-link">Sat Track</a>
+            <a href="/gs_calc/" class="nav-dropdown-link">GS Calc</a>
+          </div>
+        </li>
       </ul>
       <button class="hamburger" id="hamburger" aria-label="Menu">
         <span></span><span></span><span></span>
@@ -183,7 +189,9 @@
     <a href="/#team"     class="mob-link">Team</a>
     <a href="/#research" class="mob-link">Research</a>
     <a href="/#contact"  class="mob-link">Contact</a>
-    <a href="/sat_track/" class="nav-cta">Sat Track</a>
+    <span class="mob-apps-label">Apps</span>
+    <a href="/sat_track/" class="mob-link">Sat Track</a>
+    <a href="/gs_calc/"   class="mob-link">GS Calc</a>
   </div>
 
   <!-- ═══ CONTENT — filled from markdown, same pattern as the homepage ═══ -->

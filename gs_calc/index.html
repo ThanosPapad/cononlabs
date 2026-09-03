@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>GS Calc — Ground Station Pass Planner | Conon Labs</title>
+  <meta name="description" content="Free ground station pass planner. Load a satellite TLE, drop ground stations on the map, and compute AOS/LOS pass windows, durations, and contact-time cost estimates." />
+  <link rel="canonical" href="https://www.cononlabs.com/gs_calc/" />
+
+  <meta property="og:type"        content="website" />
+  <meta property="og:url"         content="https://www.cononlabs.com/gs_calc/" />
+  <meta property="og:title"       content="GS Calc — Ground Station Pass Planner" />
+  <meta property="og:description" content="Load a satellite TLE, drop ground stations on the map, and compute AOS/LOS pass windows, durations, and contact-time cost estimates." />
+  <meta property="og:image"       content="https://www.cononlabs.com/assets/images/conon_logo_2.png" />
+  <meta property="og:site_name"   content="Conon Labs" />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "GS Calc",
+    "url": "https://www.cononlabs.com/gs_calc/",
+    "description": "Free ground station pass planner. Load a satellite TLE, drop ground stations on the map, and compute AOS/LOS pass windows, durations, and contact-time cost estimates.",
+    "applicationCategory": "UtilitiesApplication",
+    "operatingSystem": "Any",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "Conon Labs",
+      "url": "https://www.cononlabs.com"
+    }
+  }
+  </script>
+
+  <link rel="icon" type="image/x-icon"  href="/favicon.ico" />
+  <link rel="icon" type="image/svg+xml" href="/assets/images/favicon.svg" />
+  <link rel="apple-touch-icon"          href="/assets/images/favicon.png" />
+
+  <link rel="stylesheet" href="/assets/css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+
+<style>
+  /* ── Full-screen app layout, pinned below the site nav ──── */
+  body{ overflow:hidden; }
+
+  .app-wrap{
+    position:fixed;
+    top: var(--nav-h);
+    left:0; right:0; bottom:0;
+    display:flex;
+    min-height:0;
+  }
+
+  /* ── Sidebar — matches sat_track's .tracker-sidebar exactly ─ */
+  .sidebar{
+    width: 292px;
+    flex-shrink: 0;
+    background: var(--bg2);
+    border-right: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .sb-title{
+    padding: 14px 16px 11px;
+    border-bottom: 1px solid var(--line);
+    font-family: var(--font-disp);
+    font-size: 16px;
+    letter-spacing: 0.14em;
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+  .sb-title h1{ display:inline; margin:0; font:inherit; letter-spacing:inherit; color:inherit; }
+
+  .sb-section{
+    padding: 12px 16px 14px;
+    border-bottom: 1px solid var(--line);
+    flex-shrink: 0;
+  }
+
+  .sb-label{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    font-size: 8px;
+    font-weight: 500;
+    letter-spacing: 0.26em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .sb-label .hint{ letter-spacing:0.15em; }
+
+  .sb-desc{ font-size:9.5px; line-height:1.6; color:var(--muted); margin:0 0 10px; }
+
+  .field-lbl{
+    display:block;
+    font-size: 8px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 9px 0 4px;
+  }
+  .field-lbl:first-of-type{ margin-top:0; }
+
+  /* Inputs — flat dark fields, matches .tle-area/.txt-input/.step-input */
+  input[type=text], input[type=number], input[type=datetime-local], textarea, select{
+    width:100%;
+    background:#0d1117;
+    border:1px solid rgba(255,255,255,0.08);
+    border-radius:2px;
+    color:#e6edf3;
+    font-family: var(--font-body);
+    font-size:9.5px;
+    padding:7px 8px;
+    outline:none;
+    transition:border-color .2s;
+  }
+  input:focus, textarea:focus, select:focus{ border-color: rgba(255,255,255,0.55); }
+  textarea{ resize:none; min-height:48px; line-height:1.6; font-size:9px; }
+  .tle-area{ min-height:0; line-height:1.6; font-size:9px; }
+  select{ font-family: var(--font-body); appearance:none; }
+
+  .row{ display:flex; gap:6px; align-items:center; }
+  .row > *{ flex:1; min-width:0; }
+  .flex1{ flex:1; min-width:0; }
+  .mt8{ margin-top:8px; }
+  .mt10{ margin-top:10px; }
+
+  /* Buttons — match site nav-cta / sat_track .btn style exactly */
+  button, .btn{
+    font-family: var(--font-body);
+    font-size:9px;
+    font-weight:500;
+    letter-spacing:0.18em;
+    text-transform:uppercase;
+    border:1px solid rgba(255,255,255,0.6);
+    border-radius:0;
+    background:transparent;
+    color:var(--accent);
+    padding:6px 10px;
+    cursor:pointer;
+    transition:background 0.25s, border-color 0.25s, color 0.25s;
+    white-space:nowrap;
+  }
+  button:hover, .btn:hover{ background:var(--accent); border-color:var(--accent); color:#000; }
+  button:active, .btn:active{ transform:translateY(1px); }
+  button:disabled, .btn:disabled{ opacity:0.45; cursor:not-allowed; }
+
+  /* btn-primary is visually identical to .btn — white ghost, inverts on hover */
+  button.primary{ width:100%; margin-top:12px; }
+
+  button.toggle.on{ background:var(--accent); border-color:var(--accent); color:#000; }
+
+  .small-note{
+    font-size:8.5px;
+    color:var(--muted);
+    margin-top:8px;
+    line-height:1.6;
+  }
+
+  /* Status readout — mirrors sat_track's .pos-grid/.pos-row */
+  .pos-grid{ background:#0d1117; border-radius:2px; padding:4px 10px; margin-top:10px; }
+  .pos-row{ display:flex; justify-content:space-between; align-items:baseline; padding:5px 0; }
+  .pos-row + .pos-row{ border-top:1px solid rgba(255,255,255,0.04); }
+  .pos-key{ font-size:8px; letter-spacing:0.16em; text-transform:uppercase; color:var(--muted); white-space:nowrap; margin-right:8px; }
+  .pos-val{ font-size:10px; font-weight:500; letter-spacing:0.04em; text-align:right; }
+  .pos-val.live{ color:#3fb950; }
+
+  /* Ground station list */
+  .gs-empty{
+    font-size:9.5px;
+    color:var(--muted);
+    padding:14px 4px;
+    text-align:center;
+    border:1px dashed rgba(255,255,255,0.08);
+  }
+  .gs-item{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:8px 0;
+    border-bottom:1px solid rgba(255,255,255,0.04);
+  }
+  .gs-item:last-child{ border-bottom:none; }
+  .gs-swatch{
+    width:8px; height:8px; border-radius:50%;
+    flex:none;
+    background:#f0c040;
+  }
+  .gs-meta{ flex:1; min-width:0; }
+  .gs-name{ font-size:10.5px; font-weight:500; color:var(--accent); }
+  .gs-coords{ font-size:8.5px; color:var(--muted); font-family: var(--font-body); margin-top:2px; letter-spacing:0.02em; }
+  .gs-actions{ display:flex; gap:2px; flex:none; }
+  .icon-btn{
+    background:none; border:none; color:var(--muted);
+    padding:0; width:22px; height:22px; cursor:pointer; font-size:13px; line-height:1;
+  }
+  .icon-btn:hover{ color:var(--accent); }
+  .icon-btn.remove:hover{ color:#f85149; }
+
+  /* Results */
+  .summary-table{ width:100%; border-collapse:collapse; font-size:9.5px; font-family: var(--font-body); }
+  .summary-table th{
+    text-align:left; font-size:8px; letter-spacing:0.1em; text-transform:uppercase;
+    color:var(--muted); font-weight:500; padding:0 8px 6px 0;
+    border-bottom:1px solid var(--line);
+  }
+  .summary-table td{ padding:7px 8px 7px 0; border-bottom:1px solid rgba(255,255,255,0.04); }
+  .summary-table tr:last-child td{ border-bottom:none; }
+  .summary-table .num{ font-family: var(--font-body); }
+  .summary-table .sname{ font-weight:500; }
+  .summary-table .total-row td{ border-top:1px solid var(--line); font-weight:600; color:var(--accent); padding-top:9px; }
+  .summary-table .total-row .sname{ color:var(--accent); }
+
+  .pass-toggle{ cursor:pointer; color:var(--accent); font-size:8.5px; letter-spacing:0.1em; text-transform:uppercase; font-family: var(--font-body); }
+  .pass-toggle:hover{ text-decoration:underline; }
+
+  .pass-list{ margin-top:8px; display:none; }
+  .pass-list.open{ display:block; }
+  .pass-list table{ width:100%; border-collapse:collapse; font-size:8.5px; font-family: var(--font-body); }
+  .pass-list th{ text-align:left; color:var(--muted); font-weight:500; padding:4px 6px 4px 0; }
+  .pass-list td{ padding:4px 6px 4px 0; color:var(--dim); border-top:1px solid rgba(255,255,255,0.04); }
+
+  .results-empty{ font-size:9.5px; color:var(--muted); padding:6px 2px; line-height:1.6; }
+
+  /* Status bar — mirrors sat_track's .sb-status */
+  .sb-status{
+    margin-top:auto;
+    padding:9px 16px 11px;
+    font-size:8.5px;
+    letter-spacing:0.08em;
+    color:var(--muted);
+    border-top:1px solid var(--line);
+    flex-shrink:0;
+    display:flex;
+    align-items:center;
+    gap:7px;
+  }
+  .sat-dot{ width:6px; height:6px; border-radius:50%; background:var(--muted); flex:none; }
+  .sat-dot.live{ background:#3fb950; box-shadow:0 0 8px 1px #3fb950; animation:sat-pulse 1.8s ease-in-out infinite; }
+  @keyframes sat-pulse{ 0%,100%{opacity:1;} 50%{opacity:0.45;} }
+
+  /* ---------- Map — matches sat_track's #map exactly ---------- */
+  .map-wrap{ flex:1; position:relative; min-width:0; }
+  #map{ position:absolute; inset:0; background:#0a0e14; }
+
+  .leaflet-container{ font-family: var(--font-body); background:#0a0e14; }
+
+  /* Dark Leaflet controls — identical to sat_track */
+  .leaflet-control-zoom a{
+    background:#0f0f0f !important;
+    border-color: rgba(255,255,255,0.1) !important;
+    color:#e6edf3 !important;
+  }
+  .leaflet-control-zoom a:hover{ background:#1c2128 !important; }
+  .leaflet-bar{ border:1px solid rgba(255,255,255,0.1) !important; box-shadow:none !important; }
+  .leaflet-control-attribution{
+    background: rgba(8,8,8,0.72) !important;
+    color: rgba(255,255,255,0.28) !important;
+    font-size:8px !important;
+  }
+  .leaflet-control-attribution a{ color: rgba(255,255,255,0.38) !important; }
+
+  .leaflet-popup-content-wrapper{
+    background: rgba(13,17,23,0.92); color:#e6edf3;
+    border:1px solid rgba(255,255,255,0.1); border-radius:3px;
+    box-shadow:none;
+  }
+  .leaflet-popup-content{ font-size:9.5px; margin:9px 11px; font-family: var(--font-body); }
+  .leaflet-popup-tip{ background: rgba(13,17,23,0.92); border:1px solid rgba(255,255,255,0.1); box-shadow:none; }
+
+  .placing-banner{
+    position:absolute; top:16px; left:50%; transform:translateX(-50%);
+    background: var(--accent); color:#000;
+    font-family: var(--font-body);
+    font-weight:500; font-size:9.5px; letter-spacing:0.1em; text-transform:uppercase;
+    padding:9px 16px; border-radius:0;
+    display:none; align-items:center; gap:10px;
+    z-index:1000;
+  }
+  .placing-banner.show{ display:flex; }
+  .placing-banner button{ background: rgba(0,0,0,0.15); border:none; color:#000; padding:3px 9px; font-size:8px; }
+  .placing-banner button:hover{ background: rgba(0,0,0,0.3); border:none; color:#000; }
+
+  /* Modal — same flat dark panel, sharp corners */
+  .modal-backdrop{
+    position:fixed; inset:0; background:rgba(4,6,9,0.6);
+    display:none; align-items:center; justify-content:center; z-index:2000;
+  }
+  .modal-backdrop.show{ display:flex; }
+  .modal{
+    background: var(--bg2); border:1px solid var(--line); border-radius:0;
+    width:320px; padding:20px;
+  }
+  .modal h3{ margin:0 0 14px; font-family: var(--font-disp); font-size:18px; font-weight:400; letter-spacing:0.06em; color:var(--accent); }
+  .modal .row.end{ justify-content:flex-end; margin-top:16px; gap:8px; }
+  .modal .row.end button{ flex:none; }
+
+  .divider{ height:1px; background:var(--line); margin:13px 0; }
+
+  .field-flex{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:9px; }
+  .field-flex:first-child{ margin-top:0; }
+  .field-flex .field-lbl{ margin:0; }
+  .field-flex button{ flex:none; padding:5px 9px; }
+</style>
+</head>
+<body>
+
+  <!-- ═══ NAV ═══ -->
+  <nav id="navbar" class="scrolled">
+    <div class="nav-inner">
+      <a href="/" class="nav-logo-link">
+        <img src="/assets/images/conon_logo_2.png" alt="Conon Labs" class="nav-logo" />
+      </a>
+      <ul class="nav-links">
+        <li><a href="/#about"    class="nav-link">About</a></li>
+        <li><a href="/#products" class="nav-link">Products</a></li>
+        <li><a href="/#services" class="nav-link">Services</a></li>
+        <li><a href="/#team"     class="nav-link">Team</a></li>
+        <li><a href="/#research" class="nav-link">Research</a></li>
+        <li><a href="/#contact"  class="nav-link">Contact</a></li>
+        <li><a href="/progress/"  class="nav-cta">Progress</a></li>
+        <li class="nav-dropdown">
+          <button class="nav-cta nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Apps</button>
+          <div class="nav-dropdown-menu">
+            <a href="/sat_track/" class="nav-dropdown-link">Sat Track</a>
+            <a href="/gs_calc/" class="nav-dropdown-link">GS Calc</a>
+          </div>
+        </li>
+      </ul>
+      <button class="hamburger" id="hamburger" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Mobile drawer -->
+  <div class="mobile-menu" id="mobileMenu">
+    <a href="/#about"    class="mob-link">About</a>
+    <a href="/#products" class="mob-link">Products</a>
+    <a href="/#services" class="mob-link">Services</a>
+    <a href="/#team"     class="mob-link">Team</a>
+    <a href="/#research" class="mob-link">Research</a>
+    <a href="/#contact"  class="mob-link">Contact</a>
+    <a href="/progress/" class="mob-link">Progress</a>
+    <span class="mob-apps-label">Apps</span>
+    <a href="/sat_track/" class="mob-link">Sat Track</a>
+    <a href="/gs_calc/"   class="mob-link">GS Calc</a>
+  </div>
+
+  <!-- ═══ APP ═══ -->
+  <div class="app-wrap">
+
+    <div class="sidebar">
+
+      <div class="sb-title"><h1>GS Contact Calculator</h1></div>
+
+      <!-- Description (crawlable summary of what the tool does) -->
+      <div class="sb-section">
+        <p class="sb-desc">Plan ground station contacts for any satellite — paste a TLE, drop one or more ground stations on the map, and compute AOS/LOS pass windows, durations, and contact-time cost estimates.</p>
+      </div>
+
+      <!-- SATELLITE -->
+      <div class="sb-section">
+        <div class="sb-label">Satellite <span class="hint">TLE</span></div>
+        <span class="field-lbl">Name (optional)</span>
+        <input type="text" id="satName" placeholder="e.g. ISS (ZARYA)">
+        <span class="field-lbl">Line 1</span>
+        <textarea id="tle1" class="tle-area" rows="2" placeholder="1 25544U 98067A   24001.50000000  .00016717  00000-0  10270-3 0  9994"></textarea>
+        <span class="field-lbl">Line 2</span>
+        <textarea id="tle2" class="tle-area" rows="2" placeholder="2 25544  51.6416 339.6011 0002829  68.5764 291.5798 15.50250000    1"></textarea>
+        <div class="row mt8">
+          <button class="btn" id="loadTleBtn">Load TLE</button>
+          <input type="text" id="noradId" placeholder="NORAD ID">
+          <button class="btn" id="fetchTleBtn" title="Fetch from Celestrak">Fetch</button>
+        </div>
+        <p class="small-note" id="satInfo">Paste a TLE, or fetch one by NORAD catalog number (requires internet access to celestrak.org).</p>
+        <div class="pos-grid">
+          <div class="pos-row">
+            <span class="pos-key">Status</span>
+            <span class="pos-val" style="display:flex; align-items:center; gap:6px;">
+              <span class="sat-dot" id="satDot"></span><span id="satStatus">no TLE loaded</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- GROUND STATIONS -->
+      <div class="sb-section">
+        <div class="sb-label">Ground Stations <span class="hint" id="gsCount">0</span></div>
+        <button class="btn" id="placeBtn" style="width:100%;">+ Add ground station on map</button>
+        <div id="gsList" style="margin-top:10px;">
+          <div class="gs-empty">Click "Add ground station", then click a location on the map.</div>
+        </div>
+      </div>
+
+      <!-- ORBIT / TRACK -->
+      <div class="sb-section">
+        <div class="sb-label">Orbit Track <span class="hint">visual</span></div>
+        <div class="field-flex">
+          <span class="field-lbl">Ground track (1 orbit)</span>
+          <button class="btn toggle" id="trackSwitch">Off</button>
+        </div>
+        <div class="field-flex">
+          <span class="field-lbl">Live sub-satellite point</span>
+          <button class="btn toggle" id="liveSwitch">Off</button>
+        </div>
+      </div>
+
+      <!-- TIME WINDOW -->
+      <div class="sb-section">
+        <div class="sb-label">Analysis Window <span class="hint">UTC</span></div>
+        <span class="field-lbl">Start (local time)</span>
+        <input type="datetime-local" id="startTime">
+        <div class="row mt8">
+          <div>
+            <span class="field-lbl" style="margin-top:0;">Duration</span>
+            <input type="number" id="durationVal" value="24" min="1">
+          </div>
+          <div>
+            <span class="field-lbl" style="margin-top:0;">&nbsp;</span>
+            <select id="durationUnit">
+              <option value="hours" selected>hours</option>
+              <option value="days">days</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn primary" id="computeBtn">Compute passes</button>
+        <p class="small-note" id="computeNote"></p>
+      </div>
+
+      <!-- RESULTS -->
+      <div class="sb-section" id="resultsCard">
+        <div class="sb-label">Results <span class="hint" id="resultsHint"></span></div>
+        <span class="field-lbl" style="margin-top:0;">Price per minute of connection</span>
+        <div class="row">
+          <select id="currencySelect" style="max-width:74px; flex:none;">
+            <option value="$">$</option>
+            <option value="€">€</option>
+            <option value="£">£</option>
+            <option value="¥">¥</option>
+          </select>
+          <input type="number" id="priceInput" value="0" min="0" step="0.01" placeholder="0.00">
+        </div>
+        <div class="divider"></div>
+        <div id="resultsBody">
+          <div class="results-empty">Load a TLE, add at least one ground station, and compute passes to see contact statistics here.</div>
+        </div>
+        <div class="row mt8" style="display:none;" id="exportRow">
+          <button class="btn" id="exportBtn" style="width:100%;">Export pass list (CSV)</button>
+        </div>
+      </div>
+
+      <div class="sb-status">
+        Ground station pass planner — Conon Labs
+      </div>
+
+    </div>
+
+    <div class="map-wrap">
+      <div id="map"></div>
+      <div class="placing-banner" id="placingBanner">
+        Click the map to place the ground station
+        <button id="cancelPlaceBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="modalBackdrop">
+    <div class="modal">
+      <h3>New ground station</h3>
+      <span class="field-lbl" style="margin-top:0;">Name</span>
+      <input type="text" id="modalName" placeholder="e.g. Svalbard">
+      <span class="field-lbl">Minimum elevation mask (°)</span>
+      <input type="number" id="modalElev" value="10" min="0" max="89">
+      <p class="small-note">Elevation mask is the lowest angle above the horizon at which the station is considered to have a usable connection to the satellite.</p>
+      <div class="row end">
+        <button class="btn" id="modalCancel">Cancel</button>
+        <button class="btn primary" id="modalSave" style="margin-top:0; width:auto;">Add station</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/assets/js/main.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/satellite.js@5.0.0/dist/satellite.min.js" crossorigin="anonymous"></script>
+  <script>
+(function(){
+  "use strict";
+
+  const EARTH_R = 6378.135; // km, mean equatorial radius used by SGP4 model
+
+  /* ============================================================
+     STATE
+  ============================================================ */
+  const state = {
+    satrec: null,
+    satName: "",
+    altitudeKm: null,     // average altitude estimate, km
+    groundStations: [],   // {id, name, lat, lon, minElevDeg, marker, footprint}
+    passesByStation: {},  // id -> [{aos, los, durationMin, maxElevDeg}]
+    placing: false,
+    trackLayer: null,
+    liveMarker: null,
+    liveTimer: null,
+    nextId: 1,
+    pricePerMinute: 0,
+    currency: '$'
+  };
+
+  /* ============================================================
+     MAP
+  ============================================================ */
+  const map = L.map('map', { worldCopyJump: true, zoomControl: true }).setView([20, 0], 2.4);
+
+  // Same keyless basemap as sat_track, for a visually identical map: Esri's World Dark
+  // Gray Canvas tiles, served from server.arcgisonline.com (no API key required).
+  L.tileLayer(
+    'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+    { attribution: '&copy; Esri', maxZoom: 16 }
+  ).addTo(map);
+
+  // Leaflet sometimes measures its container before the CSS grid has finished laying
+  // out (especially right after page load), which produces a blank/black map until
+  // the window is resized. Force a couple of recalculations to cover that case.
+  window.addEventListener('load', () => setTimeout(() => map.invalidateSize(), 100));
+  setTimeout(() => map.invalidateSize(), 300);
+  setTimeout(() => map.invalidateSize(), 1000);
+  window.addEventListener('resize', () => map.invalidateSize());
+
+  map.on('click', (e) => {
+    if (!state.placing) return;
+    openStationModal(e.latlng.lat, e.latlng.lng);
+  });
+
+  /* ============================================================
+     HELPERS: geodesy
+  ============================================================ */
+  function deg2rad(d){ return d * Math.PI / 180; }
+  function rad2deg(r){ return r * 180 / Math.PI; }
+
+  function destinationPoint(lat, lon, bearingDeg, distKm){
+    const R = EARTH_R;
+    const delta = distKm / R;
+    const theta = deg2rad(bearingDeg);
+    const phi1 = deg2rad(lat), lambda1 = deg2rad(lon);
+    const phi2 = Math.asin(Math.sin(phi1)*Math.cos(delta) + Math.cos(phi1)*Math.sin(delta)*Math.cos(theta));
+    const lambda2 = lambda1 + Math.atan2(
+      Math.sin(theta)*Math.sin(delta)*Math.cos(phi1),
+      Math.cos(delta) - Math.sin(phi1)*Math.sin(phi2)
+    );
+    // Deliberately NOT normalizing longitude back into [-180,180] here. Each vertex's
+    // longitude is computed independently from the station's own longitude, so it
+    // naturally stays continuous (e.g. ...,178, 181, 184,... instead of jumping to
+    // -176). If we normalized every point individually, a circle centered near the
+    // antimeridian would have some vertices wrap to -180..180 and others not, and
+    // Leaflet would draw a straight line connecting them clear across the map.
+    // Leaflet/Web Mercator render fine with longitudes outside -180..180.
+    return [rad2deg(phi2), rad2deg(lambda2)];
+  }
+
+  // Geometric footprint radius on the ground for a satellite at altitude h (km),
+  // visible above minimum elevation angle elDeg, assuming satellite at zenith.
+  function footprintRadiusKm(altKm, elDeg){
+    const Re = EARTH_R;
+    const el = deg2rad(elDeg);
+    const ratio = Re / (Re + altKm);
+    const lambda = Math.acos(ratio * Math.cos(el)) - el;
+    return Re * Math.max(lambda, 0);
+  }
+
+  function circlePolygon(lat, lon, radiusKm, points){
+    points = points || 72;
+    const coords = [];
+    for (let i=0;i<=points;i++){
+      const bearing = (360/points)*i;
+      coords.push(destinationPoint(lat, lon, bearing, radiusKm));
+    }
+    return coords;
+  }
+
+  /* ============================================================
+     SATELLITE / TLE
+  ============================================================ */
+  const satDot = document.getElementById('satDot');
+  const satStatus = document.getElementById('satStatus');
+  const satInfo = document.getElementById('satInfo');
+
+  function estimateAltitude(satrec){
+    // Sample positions across one orbital period and average the geodetic altitude.
+    const periodMin = (2*Math.PI) / satrec.no; // minutes
+    const now = new Date();
+    const samples = 24;
+    let sum = 0, n = 0;
+    for (let i=0;i<samples;i++){
+      const t = new Date(now.getTime() + (i/samples)*periodMin*60000);
+      const pv = satellite.propagate(satrec, t);
+      if (!pv.position) continue;
+      const gmst = satellite.gstime(t);
+      const geo = satellite.eciToGeodetic(pv.position, gmst);
+      sum += geo.height; // km
+      n++;
+    }
+    return n ? sum/n : null;
+  }
+
+  function loadTle(line1, line2, name){
+    try{
+      const satrec = satellite.twoline2satrec(line1.trim(), line2.trim());
+      if (!satrec || isNaN(satrec.no)) throw new Error("Could not parse TLE lines.");
+      state.satrec = satrec;
+      state.satName = name || "Satellite";
+      state.altitudeKm = estimateAltitude(satrec);
+      satDot.classList.add('live');
+      const periodMin = (2*Math.PI/satrec.no).toFixed(1);
+      satStatus.textContent = `${state.satName} · ~${Math.round(state.altitudeKm)} km · ${periodMin} min period`;
+      satInfo.textContent = `Loaded. Mean altitude ≈ ${Math.round(state.altitudeKm)} km, orbital period ≈ ${periodMin} min.`;
+      refreshAllFootprints();
+      if (document.getElementById('trackSwitch').classList.contains('on')) drawGroundTrack();
+      return true;
+    } catch(err){
+      satInfo.textContent = "Could not parse that TLE. Check the two lines and try again.";
+      return false;
+    }
+  }
+
+  document.getElementById('loadTleBtn').addEventListener('click', () => {
+    const l1 = document.getElementById('tle1').value.trim().replace(/[\r\n]+/g, '');
+    const l2 = document.getElementById('tle2').value.trim().replace(/[\r\n]+/g, '');
+    const name = document.getElementById('satName').value.trim();
+    if (!l1 || !l2){ satInfo.textContent = "Enter both TLE lines."; return; }
+    loadTle(l1, l2, name);
+  });
+
+  document.getElementById('fetchTleBtn').addEventListener('click', async () => {
+    const id = document.getElementById('noradId').value.trim();
+    if (!id){ satInfo.textContent = "Enter a NORAD catalog number first."; return; }
+    satInfo.textContent = "Fetching from Celestrak…";
+    try{
+      const res = await fetch(`https://celestrak.org/NORAD/elements/gp.php?CATNR=${encodeURIComponent(id)}&FORMAT=TLE`);
+      if (!res.ok) throw new Error("network");
+      const text = (await res.text()).trim();
+      const lines = text.split('\n').map(s=>s.trim()).filter(Boolean);
+      if (lines.length < 3) throw new Error("empty");
+      document.getElementById('tle1').value = lines[1];
+      document.getElementById('tle2').value = lines[2];
+      document.getElementById('satName').value = lines[0];
+      loadTle(lines[1], lines[2], lines[0]);
+    } catch(err){
+      satInfo.textContent = "Couldn't fetch that satellite — check the NORAD ID, your connection, or paste the TLE manually.";
+    }
+  });
+
+  /* ============================================================
+     GROUND STATIONS
+  ============================================================ */
+  const placeBtn = document.getElementById('placeBtn');
+  const placingBanner = document.getElementById('placingBanner');
+  const gsListEl = document.getElementById('gsList');
+  const gsCountEl = document.getElementById('gsCount');
+
+  const STATION_COLORS = ['#F0A85C','#45D9C6','#E5636B','#8C9EFF','#C9E45C','#F06CB2'];
+
+  placeBtn.addEventListener('click', () => {
+    state.placing = true;
+    placingBanner.classList.add('show');
+    document.getElementById('map').style.cursor = 'crosshair';
+  });
+  document.getElementById('cancelPlaceBtn').addEventListener('click', stopPlacing);
+  function stopPlacing(){
+    state.placing = false;
+    placingBanner.classList.remove('show');
+    document.getElementById('map').style.cursor = '';
+  }
+
+  // Modal
+  const modalBackdrop = document.getElementById('modalBackdrop');
+  const modalName = document.getElementById('modalName');
+  const modalElev = document.getElementById('modalElev');
+  let pendingLatLng = null;
+
+  function openStationModal(lat, lon){
+    pendingLatLng = [lat, lon];
+    modalName.value = `Station ${state.groundStations.length + 1}`;
+    modalElev.value = 10;
+    modalBackdrop.classList.add('show');
+    stopPlacing();
+    setTimeout(()=>modalName.focus(), 30);
+  }
+  document.getElementById('modalCancel').addEventListener('click', () => modalBackdrop.classList.remove('show'));
+  document.getElementById('modalSave').addEventListener('click', () => {
+    const name = modalName.value.trim() || 'Ground station';
+    const elev = parseFloat(modalElev.value);
+    addGroundStation(name, pendingLatLng[0], pendingLatLng[1], isFinite(elev)?elev:10);
+    modalBackdrop.classList.remove('show');
+  });
+
+  function addGroundStation(name, lat, lon, minElevDeg){
+    const id = state.nextId++;
+    const color = STATION_COLORS[(id-1) % STATION_COLORS.length];
+
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="width:12px;height:12px;border-radius:50%;background:${color};border:2px solid #0A0E14;box-shadow:0 0 0 2px ${color}55;"></div>`,
+      iconSize: [12,12], iconAnchor: [6,6]
+    });
+    const marker = L.marker([lat, lon], { icon, draggable: true }).addTo(map);
+    marker.bindPopup(`<b>${escapeHtml(name)}</b><br>${lat.toFixed(3)}°, ${lon.toFixed(3)}°<br>mask ${minElevDeg}°`);
+
+    const gs = { id, name, lat, lon, minElevDeg, color, marker, footprint: null };
+    state.groundStations.push(gs);
+
+    marker.on('drag', (e) => {
+      gs.lat = e.target.getLatLng().lat;
+      gs.lon = e.target.getLatLng().lng;
+      updateFootprint(gs);
+      renderGsList();
+    });
+    marker.on('dragend', () => renderGsList());
+
+    updateFootprint(gs);
+    renderGsList();
+    renderResults();
+  }
+
+  function updateFootprint(gs){
+    if (gs.footprint){ map.removeLayer(gs.footprint); gs.footprint = null; }
+    if (!state.altitudeKm) return;
+    const r = footprintRadiusKm(state.altitudeKm, gs.minElevDeg);
+    const coords = circlePolygon(gs.lat, gs.lon, r);
+    gs.footprint = L.polygon(coords, {
+      color: gs.color, weight: 1.4, opacity: 0.75,
+      fillColor: gs.color, fillOpacity: 0.08
+    }).addTo(map);
+  }
+
+  function refreshAllFootprints(){
+    state.groundStations.forEach(updateFootprint);
+  }
+
+  function removeGroundStation(id){
+    const gs = state.groundStations.find(g=>g.id===id);
+    if (!gs) return;
+    map.removeLayer(gs.marker);
+    if (gs.footprint) map.removeLayer(gs.footprint);
+    state.groundStations = state.groundStations.filter(g=>g.id!==id);
+    delete state.passesByStation[id];
+    renderGsList();
+    renderResults();
+  }
+
+  function renderGsList(){
+    gsCountEl.textContent = state.groundStations.length;
+    if (!state.groundStations.length){
+      gsListEl.innerHTML = '<div class="gs-empty">Click "Add ground station", then click a location on the map.</div>';
+      return;
+    }
+    gsListEl.innerHTML = '';
+    state.groundStations.forEach(gs => {
+      const row = document.createElement('div');
+      row.className = 'gs-item';
+      row.innerHTML = `
+        <div class="gs-swatch" style="background:${gs.color}"></div>
+        <div class="gs-meta">
+          <div class="gs-name">${escapeHtml(gs.name)}</div>
+          <div class="gs-coords">${gs.lat.toFixed(2)}°, ${gs.lon.toFixed(2)}° · mask ${gs.minElevDeg}°</div>
+        </div>
+        <div class="gs-actions">
+          <button class="icon-btn focus" title="Center map">&#9678;</button>
+          <button class="icon-btn remove" title="Remove">&#10005;</button>
+        </div>`;
+      row.querySelector('.focus').addEventListener('click', () => map.setView([gs.lat, gs.lon], 5));
+      row.querySelector('.remove').addEventListener('click', () => removeGroundStation(gs.id));
+      gsListEl.appendChild(row);
+    });
+  }
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  /* ============================================================
+     ORBIT TRACK + LIVE MARKER
+  ============================================================ */
+  const trackSwitch = document.getElementById('trackSwitch');
+  const liveSwitch = document.getElementById('liveSwitch');
+
+  trackSwitch.addEventListener('click', () => {
+    const on = trackSwitch.classList.toggle('on');
+    trackSwitch.textContent = on ? 'On' : 'Off';
+    if (on) drawGroundTrack();
+    else if (state.trackLayer){ map.removeLayer(state.trackLayer); state.trackLayer = null; }
+  });
+
+  liveSwitch.addEventListener('click', () => {
+    const on = liveSwitch.classList.toggle('on');
+    liveSwitch.textContent = on ? 'On' : 'Off';
+    if (on) startLiveTracking();
+    else stopLiveTracking();
+  });
+
+  function drawGroundTrack(){
+    if (!state.satrec) return;
+    if (state.trackLayer){ map.removeLayer(state.trackLayer); state.trackLayer = null; }
+    const periodMin = (2*Math.PI)/state.satrec.no;
+    const now = new Date();
+    const steps = 180;
+    let segments = [[]];
+    let prevLon = null;
+    for (let i=0;i<=steps;i++){
+      const t = new Date(now.getTime() + (i/steps)*periodMin*60000);
+      const pv = satellite.propagate(state.satrec, t);
+      if (!pv.position) continue;
+      const gmst = satellite.gstime(t);
+      const geo = satellite.eciToGeodetic(pv.position, gmst);
+      const lat = satellite.degreesLat(geo.latitude);
+      const lon = satellite.degreesLong(geo.longitude);
+      if (prevLon !== null && Math.abs(lon - prevLon) > 180){
+        segments.push([]);
+      }
+      segments[segments.length-1].push([lat, lon]);
+      prevLon = lon;
+    }
+    state.trackLayer = L.layerGroup(
+      segments.filter(s=>s.length>1).map(s => L.polyline(s, { color:'#58a6ff', weight:1.6, opacity:0.65, dashArray:'2,5' }))
+    ).addTo(map);
+  }
+
+  function startLiveTracking(){
+    if (!state.satrec) return;
+    stopLiveTracking();
+    const icon = L.divIcon({
+      className:'',
+      html:`<div style="width:14px;height:14px;border-radius:50%;background:#F0A85C;border:2px solid #0A0E14;box-shadow:0 0 12px 2px #F0A85C;"></div>`,
+      iconSize:[14,14], iconAnchor:[7,7]
+    });
+    state.liveMarker = L.marker([0,0], { icon }).addTo(map);
+    const tick = () => {
+      const t = new Date();
+      const pv = satellite.propagate(state.satrec, t);
+      if (!pv.position) return;
+      const gmst = satellite.gstime(t);
+      const geo = satellite.eciToGeodetic(pv.position, gmst);
+      const lat = satellite.degreesLat(geo.latitude);
+      const lon = satellite.degreesLong(geo.longitude);
+      state.liveMarker.setLatLng([lat, lon]);
+      state.liveMarker.bindPopup(`<b>${escapeHtml(state.satName)}</b><br>${lat.toFixed(2)}°, ${lon.toFixed(2)}°<br>alt ${geo.height.toFixed(0)} km`);
+    };
+    tick();
+    state.liveTimer = setInterval(tick, 1000);
+  }
+  function stopLiveTracking(){
+    if (state.liveTimer){ clearInterval(state.liveTimer); state.liveTimer = null; }
+    if (state.liveMarker){ map.removeLayer(state.liveMarker); state.liveMarker = null; }
+  }
+
+  /* ============================================================
+     TIME WINDOW DEFAULTS
+  ============================================================ */
+  const startTimeEl = document.getElementById('startTime');
+  (function initStartTime(){
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    startTimeEl.value = now.toISOString().slice(0,16);
+  })();
+
+  /* ============================================================
+     PASS COMPUTATION
+  ============================================================ */
+  const computeBtn = document.getElementById('computeBtn');
+  const computeNote = document.getElementById('computeNote');
+
+  computeBtn.addEventListener('click', computePasses);
+
+  function computePasses(){
+    computeNote.textContent = '';
+    if (!state.satrec){ computeNote.textContent = 'Load a TLE first.'; return; }
+    if (!state.groundStations.length){ computeNote.textContent = 'Add at least one ground station first.'; return; }
+
+    const startLocal = startTimeEl.value;
+    if (!startLocal){ computeNote.textContent = 'Set a start time.'; return; }
+    const start = new Date(startLocal);
+    const durVal = parseFloat(document.getElementById('durationVal').value) || 24;
+    const durUnit = document.getElementById('durationUnit').value;
+    const durationMs = durUnit === 'days' ? durVal*86400000 : durVal*3600000;
+    const end = new Date(start.getTime() + durationMs);
+
+    const totalSeconds = durationMs/1000;
+    const MAX_SAMPLES = 120000;
+    let stepSec = Math.max(2, Math.ceil(totalSeconds / MAX_SAMPLES));
+    stepSec = Math.min(stepSec, 30); // never coarser than 30s, keeps short passes visible
+
+    computeBtn.disabled = true;
+    computeBtn.textContent = 'Computing…';
+
+    setTimeout(() => {
+      state.passesByStation = {};
+      state.groundStations.forEach(gs => {
+        state.passesByStation[gs.id] = findPasses(gs, start, end, stepSec);
+      });
+      computeBtn.disabled = false;
+      computeBtn.textContent = 'Compute passes';
+      const durationLabel = durUnit === 'days' ? `${durVal} day${durVal!=1?'s':''}` : `${durVal} hour${durVal!=1?'s':''}`;
+      computeNote.textContent = `Computed over ${durationLabel} starting ${start.toISOString().slice(0,16).replace('T',' ')} UTC (step ${stepSec}s).`;
+      renderResults();
+    }, 20);
+  }
+
+  function elevationAt(gs, date){
+    const pv = satellite.propagate(state.satrec, date);
+    if (!pv.position) return null;
+    const gmst = satellite.gstime(date);
+    const observerGd = {
+      longitude: deg2rad(gs.lon),
+      latitude: deg2rad(gs.lat),
+      height: 0.05
+    };
+    const posEcf = satellite.eciToEcf(pv.position, gmst);
+    const look = satellite.ecfToLookAngles(observerGd, posEcf);
+    return rad2deg(look.elevation);
+  }
+
+  function findPasses(gs, start, end, stepSec){
+    const passes = [];
+    let prevT = new Date(start);
+    let prevEl = elevationAt(gs, prevT);
+    let inPass = prevEl !== null && prevEl >= gs.minElevDeg;
+    let aosTime = inPass ? prevT : null;
+    let maxEl = inPass ? prevEl : -90;
+
+    for (let t = new Date(start.getTime()+stepSec*1000); t <= end; t = new Date(t.getTime()+stepSec*1000)){
+      const el = elevationAt(gs, t);
+      if (el === null){ prevT = t; prevEl = el; continue; }
+
+      if (!inPass && el >= gs.minElevDeg){
+        // AOS crossing between prevT and t — linear interpolate
+        const frac = prevEl===null ? 0 : (gs.minElevDeg - prevEl) / (el - prevEl);
+        aosTime = new Date(prevT.getTime() + frac*(t.getTime()-prevT.getTime()));
+        inPass = true;
+        maxEl = el;
+      } else if (inPass && el < gs.minElevDeg){
+        const frac = (gs.minElevDeg - prevEl) / (el - prevEl);
+        const losTime = new Date(prevT.getTime() + frac*(t.getTime()-prevT.getTime()));
+        passes.push({
+          aos: aosTime, los: losTime,
+          durationMin: (losTime - aosTime)/60000,
+          maxElevDeg: maxEl
+        });
+        inPass = false;
+        aosTime = null;
+        maxEl = -90;
+      } else if (inPass){
+        if (el > maxEl) maxEl = el;
+      }
+      prevT = t; prevEl = el;
+    }
+    // Pass still open at end of window
+    if (inPass && aosTime){
+      passes.push({ aos: aosTime, los: end, durationMin: (end-aosTime)/60000, maxElevDeg: maxEl, ongoing: true });
+    }
+    return passes;
+  }
+
+  /* ============================================================
+     RESULTS RENDERING
+  ============================================================ */
+  const resultsBody = document.getElementById('resultsBody');
+  const resultsHint = document.getElementById('resultsHint');
+  const exportRow = document.getElementById('exportRow');
+
+  function fmtTime(d){
+    return d.toISOString().slice(0,16).replace('T',' ');
+  }
+  function fmtMin(m){
+    if (m < 1) return `${Math.round(m*60)}s`;
+    return `${m.toFixed(1)} min`;
+  }
+  function fmtCost(min){
+    const c = min * state.pricePerMinute;
+    return `${state.currency}${c.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}`;
+  }
+
+  function renderResults(){
+    const hasData = Object.keys(state.passesByStation).length > 0;
+    if (!state.groundStations.length){
+      resultsBody.innerHTML = '<div class="results-empty">Load a TLE, add at least one ground station, and compute passes to see contact statistics here.</div>';
+      resultsHint.textContent = '';
+      exportRow.style.display = 'none';
+      return;
+    }
+    if (!hasData){
+      resultsBody.innerHTML = '<div class="results-empty">Ground stations are set — click "Compute passes" to generate contact statistics.</div>';
+      resultsHint.textContent = '';
+      exportRow.style.display = 'none';
+      return;
+    }
+
+    let totalPasses = 0;
+    let grandTotalMin = 0;
+    const showCost = state.pricePerMinute > 0;
+    const colCount = showCost ? 6 : 5;
+    let html = `<table class="summary-table"><thead><tr><th>Station</th><th>Passes</th><th>Total min</th><th>Avg min</th>${showCost?'<th>Cost</th>':''}<th></th></tr></thead><tbody>`;
+    state.groundStations.forEach(gs => {
+      const passes = state.passesByStation[gs.id] || [];
+      totalPasses += passes.length;
+      const totalMin = passes.reduce((s,p)=>s+p.durationMin, 0);
+      grandTotalMin += totalMin;
+      const avgMin = passes.length ? totalMin/passes.length : 0;
+      html += `<tr>
+        <td class="sname"><span style="color:${gs.color}">&#9679;</span> ${escapeHtml(gs.name)}</td>
+        <td class="num">${passes.length}</td>
+        <td class="num">${totalMin.toFixed(1)}</td>
+        <td class="num">${avgMin.toFixed(1)}</td>
+        ${showCost?`<td class="num">${fmtCost(totalMin)}</td>`:''}
+        <td><span class="pass-toggle" data-id="${gs.id}">details</span></td>
+      </tr>`;
+      html += `<tr class="pass-row-${gs.id}"><td colspan="${colCount}" style="border:none; padding:0;">
+        <div class="pass-list" id="passlist-${gs.id}">
+          ${passes.length ? renderPassTable(passes, showCost) : '<div class="results-empty">No passes above the elevation mask in this window.</div>'}
+        </div>
+      </td></tr>`;
+    });
+    if (state.groundStations.length > 1){
+      html += `<tr class="total-row">
+        <td class="sname">All stations</td>
+        <td class="num">${totalPasses}</td>
+        <td class="num">${grandTotalMin.toFixed(1)}</td>
+        <td class="num">—</td>
+        ${showCost?`<td class="num">${fmtCost(grandTotalMin)}</td>`:''}
+        <td></td>
+      </tr>`;
+    }
+    html += '</tbody></table>';
+    resultsBody.innerHTML = html;
+    resultsHint.textContent = showCost
+      ? `${totalPasses} pass${totalPasses!=1?'es':''} · ${grandTotalMin.toFixed(1)} min · ${fmtCost(grandTotalMin)}`
+      : `${totalPasses} pass${totalPasses!=1?'es':''} · ${grandTotalMin.toFixed(1)} min total`;
+    exportRow.style.display = totalPasses ? 'flex' : 'none';
+
+    resultsBody.querySelectorAll('.pass-toggle').forEach(el => {
+      el.addEventListener('click', () => {
+        document.getElementById(`passlist-${el.dataset.id}`).classList.toggle('open');
+      });
+    });
+  }
+
+  function renderPassTable(passes, showCost){
+    let html = `<table><thead><tr><th>AOS (UTC)</th><th>LOS (UTC)</th><th>Dur.</th><th>Max el.</th>${showCost?'<th>Cost</th>':''}</tr></thead><tbody>`;
+    passes.forEach(p => {
+      html += `<tr><td>${fmtTime(p.aos)}</td><td>${fmtTime(p.los)}${p.ongoing?' *':''}</td><td>${fmtMin(p.durationMin)}</td><td>${p.maxElevDeg.toFixed(1)}°</td>${showCost?`<td>${fmtCost(p.durationMin)}</td>`:''}</tr>`;
+    });
+    html += '</tbody></table>';
+    return html;
+  }
+
+  document.getElementById('priceInput').addEventListener('input', (e) => {
+    state.pricePerMinute = parseFloat(e.target.value) || 0;
+    renderResults();
+    saveToStorage();
+  });
+  document.getElementById('currencySelect').addEventListener('change', (e) => {
+    state.currency = e.target.value;
+    renderResults();
+    saveToStorage();
+  });
+
+  document.getElementById('exportBtn').addEventListener('click', () => {
+    const showCost = state.pricePerMinute > 0;
+    let csv = `Ground Station,AOS (UTC),LOS (UTC),Duration (min),Max Elevation (deg)${showCost?',Cost':''}\n`;
+    state.groundStations.forEach(gs => {
+      (state.passesByStation[gs.id]||[]).forEach(p => {
+        csv += `"${gs.name}",${p.aos.toISOString()},${p.los.toISOString()},${p.durationMin.toFixed(2)},${p.maxElevDeg.toFixed(1)}${showCost?','+(p.durationMin*state.pricePerMinute).toFixed(2):''}\n`;
+      });
+    });
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'ground_station_passes.csv';
+    a.click();
+  });
+
+  /* ============================================================
+     PERSISTENCE (localStorage)
+  ============================================================ */
+  function saveToStorage(){
+    try{
+      const data = {
+        satName: state.satName,
+        tle1: document.getElementById('tle1').value,
+        tle2: document.getElementById('tle2').value,
+        stations: state.groundStations.map(g => ({name:g.name, lat:g.lat, lon:g.lon, minElevDeg:g.minElevDeg})),
+        pricePerMinute: state.pricePerMinute,
+        currency: state.currency
+      };
+      localStorage.setItem('passage_state', JSON.stringify(data));
+    } catch(e){ /* storage unavailable — ignore */ }
+  }
+
+  function loadFromStorage(){
+    try{
+      const raw = localStorage.getItem('passage_state');
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (data.tle1 && data.tle2){
+        document.getElementById('tle1').value = data.tle1;
+        document.getElementById('tle2').value = data.tle2;
+        document.getElementById('satName').value = data.satName || '';
+        loadTle(data.tle1, data.tle2, data.satName);
+      }
+      if (typeof data.pricePerMinute === 'number'){
+        state.pricePerMinute = data.pricePerMinute;
+        document.getElementById('priceInput').value = data.pricePerMinute;
+      }
+      if (data.currency){
+        state.currency = data.currency;
+        document.getElementById('currencySelect').value = data.currency;
+      }
+      (data.stations||[]).forEach(s => addGroundStation(s.name, s.lat, s.lon, s.minElevDeg));
+    } catch(e){ /* ignore corrupt/missing state */ }
+  }
+
+  // Persist on any meaningful change
+  ['click'].forEach(evt => document.body.addEventListener(evt, () => setTimeout(saveToStorage, 50)));
+
+  window.addEventListener('load', loadFromStorage);
+
+})();
+  </script>
+  <script data-goatcounter="https://thanospapad.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
