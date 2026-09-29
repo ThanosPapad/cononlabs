@@ -152,12 +152,49 @@ const observer = new IntersectionObserver(entries => {
 sections.forEach(sec => observer.observe(sec));
 
 /* ── Smooth scroll for all anchor links ─────────────────── */
+// Sections grow as their markdown/images load, so a one-off scroll position goes
+// stale. Keep re-aligning to the target until the layout settles or the user scrolls.
+let pendingTarget = null;
+let settleTimer   = null;
+
+const targetTop = el => el.offsetTop - (el.id === 'hero' ? 0 : NAV_H - 4);
+
+function armSettleTimer() {
+  clearTimeout(settleTimer);
+  settleTimer = setTimeout(() => { pendingTarget = null; }, 2500);
+}
+
+function scrollToTarget(el) {
+  pendingTarget = el;
+  armSettleTimer();
+  window.scrollTo({ top: targetTop(el), behavior: 'smooth' });
+}
+
+new ResizeObserver(() => {
+  if (!pendingTarget) return;
+  window.scrollTo({ top: targetTop(pendingTarget), behavior: 'instant' });
+  armSettleTimer();
+}).observe(document.body);
+
+['wheel', 'touchstart', 'keydown', 'mousedown'].forEach(evt =>
+  window.addEventListener(evt, () => { pendingTarget = null; }, { passive: true })
+);
+
 document.querySelectorAll('a[href^="#"]').forEach(link => {
   link.addEventListener('click', e => {
     const target = document.querySelector(link.getAttribute('href'));
     if (!target) return;
     e.preventDefault();
-    const top = target.offsetTop - (target.id === 'hero' ? 0 : NAV_H - 4);
-    window.scrollTo({ top, behavior: 'smooth' });
+    scrollToTarget(target);
   });
 });
+
+// Arriving via /#section (e.g. from another page)
+if (location.hash.length > 1) {
+  const hashTarget = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+  if (hashTarget) {
+    pendingTarget = hashTarget;
+    armSettleTimer();
+    window.scrollTo({ top: targetTop(hashTarget), behavior: 'instant' });
+  }
+}

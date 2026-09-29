@@ -490,18 +490,6 @@ footer {
   color: var(--muted);
   letter-spacing: 0.1em;
 }
-.footer-gh {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  text-decoration: none;
-  color: var(--muted);
-  transition: color 0.2s;
-}
-.footer-gh:hover { color: var(--accent); }
 
 /* ─── Markdown images ───────────────────────────────────── */
 .md-image {
