@@ -1,0 +1,2517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>RF-Link — S-Band Ground Dome &amp; Link Budget Calculator | Conon Labs</title>
+  <meta name="description" content="Free S-band link budget tool. Build a ground antenna dome, see sky coverage, simulate LEO passes with Doppler, and check uplink and downlink margins for a CubeSat." />
+  <link rel="canonical" href="https://www.cononlabs.com/rf_link/" />
+
+  <meta property="og:type"        content="website" />
+  <meta property="og:url"         content="https://www.cononlabs.com/rf_link/" />
+  <meta property="og:title"       content="RF-Link — S-Band Ground Dome & Link Budget Calculator" />
+  <meta property="og:description" content="Build a ground antenna dome, see sky coverage, simulate LEO passes with Doppler, and check uplink and downlink margins." />
+  <meta property="og:image"       content="https://www.cononlabs.com/assets/images/conon_logo_2.png" />
+  <meta property="og:site_name"   content="Conon Labs" />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "RF-Link",
+    "url": "https://www.cononlabs.com/rf_link/",
+    "description": "Free S-band link budget tool. Build a ground antenna dome, see sky coverage, simulate LEO passes with Doppler, and check uplink and downlink margins.",
+    "applicationCategory": "UtilitiesApplication",
+    "operatingSystem": "Any",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "Conon Labs",
+      "url": "https://www.cononlabs.com"
+    }
+  }
+  </script>
+
+  <link rel="icon" type="image/x-icon"  href="/favicon.ico" />
+  <link rel="icon" type="image/svg+xml" href="/assets/images/favicon.svg" />
+  <link rel="apple-touch-icon"          href="/assets/images/favicon.png" />
+
+  <link rel="stylesheet" href="/assets/css/style.css" />
+
+<style>
+/* RF-Link. Every rule is scoped under #rf so nothing leaks into the site nav or other pages.
+   Layout matches sat_track / gs_calc: a full-screen app under the nav, panes scroll independently. */
+body { overflow: hidden; }
+
+#rf {
+  --bg: #080808; --surface: #0f0f0f; --surface2: #161616; --ink: #ffffff; --muted: #8d9199; --line: #262626;
+  --accent: #ffffff; --accent-ink: #000000; --pass: #3fcf91; --fail: #ff7166; --warn: #f0b04a; --mid: #4a5563;
+  --dn: #7ba3ff; --up: #ffab5c;
+  --f-display: var(--font-disp, 'Bebas Neue', sans-serif);
+  --f-body: var(--font-body, 'DM Mono', monospace);
+  --f-mono: var(--font-body, 'DM Mono', monospace);
+  position: fixed; top: var(--nav-h); left: 0; right: 0; bottom: 0;
+  display: flex; min-height: 0;
+  background: var(--bg); color: var(--ink); font-family: var(--f-body); font-weight: 300; font-size: 12px; line-height: 1.6;
+  color-scheme: dark;
+}
+#rf *, #rf *::before, #rf *::after { box-sizing: border-box; }
+#rf [hidden] { display: none !important; }
+#rf h1, #rf h2, #rf h3 { font-family: var(--f-display); font-weight: 400; margin: 0; letter-spacing: 0.08em; }
+#rf button, #rf input, #rf select { font: inherit; color: inherit; }
+#rf button { cursor: pointer; }
+#rf :focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
+
+/* panes */
+#rf .pane { min-width: 0; min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
+#rf .paneL { width: 292px; flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--line); }
+#rf .paneR { width: 340px; flex-shrink: 0; background: var(--surface); border-left: 1px solid var(--line); }
+#rf .paneM { flex: 1; padding: 18px 20px 40px; display: flex; flex-direction: column; gap: 18px; }
+#rf .sbTitle { padding: 14px 16px 11px; border-bottom: 1px solid var(--line); font-family: var(--f-display); font-size: 16px; letter-spacing: 0.14em; color: var(--accent); }
+#rf .sbTitle h1 { display: inline; font: inherit; letter-spacing: inherit; color: inherit; }
+#rf .sbTitle .tag { display: block; margin-top: 2px; font-family: var(--f-body); font-size: 10px; letter-spacing: 0.04em; color: var(--muted); }
+#rf .setup { padding: 12px 16px; border-bottom: 1px solid var(--line); }
+#rf .setup .sLabel { font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+#rf .setup .sBtns { display: flex; gap: 8px; }
+#rf .setup .sBtns .btn { flex: 1; }
+#rf .setup .sMsg { margin-top: 8px; font-size: 10.5px; line-height: 1.5; color: var(--pass); overflow-wrap: anywhere; }
+#rf .setup .sMsg.err { color: var(--fail); }
+#rf .paneL.drop { outline: 1px dashed var(--accent); outline-offset: -6px; }
+#rf .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+#rf .chip { font-size: 10.5px; letter-spacing: 0.06em; padding: 3px 8px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); }
+
+#rf .card { background: var(--surface); border: 1px solid var(--line); min-width: 0; }
+#rf .paneL .card, #rf .paneR .card { border: 0; border-bottom: 1px solid var(--line); background: transparent; }
+#rf .card > .hd { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 11px 16px; border-bottom: 1px solid var(--line); }
+#rf .card h2 { font-size: 16px; letter-spacing: 0.12em; color: var(--accent); }
+#rf .card .bd { padding: 16px; }
+#rf .sub { color: var(--muted); font-size: 11px; }
+
+#rf details.grp { border-bottom: 1px solid var(--line); }
+#rf details.grp:last-child { border-bottom: 0; }
+#rf details.grp > summary { list-style: none; cursor: pointer; padding: 11px 16px; font-size: 9.5px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted); display: flex; justify-content: space-between; align-items: center; }
+#rf details.grp > summary::-webkit-details-marker { display: none; }
+#rf details.grp > summary::after { content: '+'; color: var(--muted); }
+#rf details.grp[open] > summary::after { content: '\2212'; }
+#rf details.grp[open] > summary { color: var(--ink); }
+#rf details.grp .gb { padding: 0 16px 16px; display: grid; gap: 13px; }
+
+#rf .fld label { display: block; font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+#rf .fld .inp { display: flex; align-items: center; gap: 6px; }
+#rf .fld input[type="text"], #rf .fld select, #rf .txt, #rf .paneM select { width: 100%; min-width: 0; background: #0d1117; border: 1px solid rgba(255,255,255,0.08); border-radius: 0; padding: 7px 8px; font-family: var(--f-body); font-size: 11.5px; color: #e6edf3; }
+#rf .fld input[type="text"] { text-align: right; }
+#rf .fld input:focus, #rf .fld select:focus { border-color: rgba(255,255,255,0.55); outline: 0; }
+#rf .fld input.bad { border-color: var(--fail); }
+#rf .fld select { appearance: none; -webkit-appearance: none; }
+#rf .fld .unit { font-size: 10px; color: var(--muted); min-width: 30px; }
+#rf .fld .rng { width: 100%; margin: 6px 0 0; accent-color: #fff; }
+#rf .fld .err { color: var(--fail); font-size: 11px; margin-top: 3px; }
+#rf .fld .hint { color: var(--muted); font-size: 10.5px; margin-top: 3px; line-height: 1.5; }
+#rf .fld.dis { opacity: 0.5; }
+#rf .quick { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
+#rf .blurb { font-size: 10.5px; color: var(--muted); line-height: 1.55; }
+#rf .btn { font-size: 9px; font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase; border: 1px solid rgba(255,255,255,0.6); border-radius: 0; background: transparent; color: var(--accent); padding: 6px 10px; transition: background .25s, border-color .25s, color .25s; white-space: nowrap; }
+#rf .btn:hover { background: var(--accent); border-color: var(--accent); color: #000; }
+#rf .btn.pri { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 500; }
+#rf .btn.pri:hover { background: transparent; color: var(--accent); }
+#rf .btn.on { background: var(--accent); color: #000; border-color: var(--accent); }
+#rf .btn.sm { padding: 3px 7px; font-size: 8.5px; }
+#rf .btn.danger:hover { background: var(--fail); border-color: var(--fail); color: #000; }
+
+#rf .derived { display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; font-size: 11px; padding: 12px 16px 16px; margin: 0; }
+#rf .derived dt { color: var(--muted); }
+#rf .derived dd { margin: 0; text-align: right; }
+
+#rf .tabs { display: inline-flex; border: 1px solid var(--line); }
+#rf .tabs button { border: 0; background: transparent; padding: 6px 12px; font-size: 9.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+#rf .tabs button[aria-selected="true"] { background: var(--accent); color: #000; }
+#rf .layerSel { display: flex; align-items: center; gap: 8px; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+#rf .layerSel select { width: auto; padding: 5px 8px; max-width: 100%; }
+
+#rf .stage { position: relative; width: 100%; max-width: 760px; margin: 0 auto; aspect-ratio: 1 / 1; }
+#rf .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
+#rf .legend { max-width: 760px; margin: 8px auto 0; }
+#rf .lg-bar { height: 10px; border: 1px solid var(--line); }
+#rf .lg-ticks { position: relative; height: 20px; font-size: 10.5px; color: var(--muted); }
+#rf .lg-ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; top: 3px; }
+#rf .lg-chips { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 11px; }
+#rf .lg-chips i { display: inline-block; width: 10px; height: 10px; margin-right: 5px; vertical-align: -1px; }
+#rf .toggles { display: flex; flex-wrap: wrap; gap: 8px 18px; max-width: 760px; margin: 12px auto 0; font-size: 10.5px; color: var(--muted); }
+#rf .toggles label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+#rf .toggles input { accent-color: #fff; }
+#rf .probe { max-width: 760px; margin: 8px auto 0; min-height: 44px; font-size: 11px; color: var(--ink); background: #0d1117; border: 1px solid var(--line); padding: 8px 12px; overflow-wrap: anywhere; }
+#rf .soloBar { max-width: 760px; margin: 8px auto 0; font-size: 11px; color: var(--muted); }
+
+#rf .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+#rf .kpi { border: 1px solid var(--line); padding: 12px; background: var(--bg); min-width: 0; }
+#rf .kpi .k { font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+#rf .kpi .v { font-size: 24px; font-weight: 400; margin: 4px 0; }
+#rf .kpi .s { font-size: 10.5px; color: var(--muted); overflow-wrap: anywhere; line-height: 1.5; }
+#rf .pass { color: var(--pass); } #rf .fail { color: var(--fail); } #rf .warnc { color: var(--warn); }
+#rf .checks { margin: 16px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+#rf .checks li { display: flex; gap: 10px; font-size: 11.5px; align-items: baseline; }
+#rf .badge { flex: none; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; padding: 1px 6px; border: 1px solid; }
+#rf .badge.error { color: var(--fail); border-color: var(--fail); }
+#rf .badge.warn { color: var(--warn); border-color: var(--warn); }
+#rf .badge.info { color: var(--muted); border-color: var(--line); }
+
+#rf .chartWrap { position: relative; width: 100%; height: 300px; }
+#rf .chartWrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+#rf .cl { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 11px; color: var(--muted); margin-bottom: 10px; }
+#rf .cl i { display: inline-block; width: 18px; height: 0; border-top: 2px solid; vertical-align: 3px; margin-right: 5px; }
+#rf .cl i.d { border-top-style: dashed; }
+#rf .cl i.band { height: 8px; border: 0; background: var(--muted); opacity: 0.35; vertical-align: -1px; }
+
+#rf .tools { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); align-items: center; }
+#rf .ring { padding: 12px 16px; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+#rf .ring .full { grid-column: 1 / -1; }
+#rf .msg { font-size: 10.5px; color: var(--warn); padding: 0 16px 8px; }
+#rf .alist { display: grid; gap: 10px; padding: 14px 16px; }
+#rf .acard { border: 1px solid var(--line); padding: 10px 12px; background: var(--bg); cursor: pointer; min-width: 0; }
+#rf .acard.sel { border-color: var(--accent); }
+#rf .acard.off { opacity: 0.55; }
+#rf .ahead { display: flex; align-items: center; gap: 8px; min-width: 0; }
+#rf .sw { flex: none; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 10px; font-weight: 500; }
+#rf .ahead b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+#rf .ahead .btns { margin-left: auto; display: flex; gap: 4px; flex: none; }
+#rf .ameta { font-size: 10.5px; color: var(--muted); margin-top: 3px; overflow-wrap: anywhere; }
+#rf .bar { height: 4px; background: var(--surface2); margin: 6px 0 4px; overflow: hidden; }
+#rf .bar i { display: block; height: 100%; }
+#rf .astat { font-size: 10.5px; line-height: 1.5; margin-top: 4px; color: var(--muted); overflow-wrap: anywhere; }
+#rf .bad { color: var(--fail); }
+#rf .okc { color: var(--pass); }
+
+#rf .edit { padding: 16px; display: grid; gap: 13px; }
+#rf .edit .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+#rf .edit .note { font-size: 10.5px; color: var(--fail); }
+#rf .edit .row { display: flex; gap: 6px; flex-wrap: wrap; }
+#rf .cutWrap { width: 100%; max-width: 260px; aspect-ratio: 1 / 1; margin: 0 auto; position: relative; }
+#rf .cutWrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+#rf .foot { color: var(--muted); font-size: 10.5px; margin-top: 8px; border-top: 1px solid var(--line); padding-top: 14px; }
+#rf .foot p { max-width: 90ch; margin: 0 0 6px; }
+
+#rf .lchain { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 24px; }
+#rf .lc { min-width: 0; }
+#rf .lct { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+#rf .pill { font-size: 10px; padding: 1px 7px; border-radius: 10px; border: 1px solid; }
+#rf .pill.pass { color: var(--pass); border-color: var(--pass); }
+#rf .pill.fail { color: var(--fail); border-color: var(--fail); }
+#rf .cr { display: grid; grid-template-columns: minmax(90px, 1.3fr) minmax(40px, 1fr) 48px 62px; gap: 6px; align-items: center; font-size: 11px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+#rf .cr .cn { overflow-wrap: anywhere; }
+#rf .cr .ct { position: relative; height: 8px; background: var(--line); }
+#rf .cr .ct i { position: absolute; top: 0; bottom: 0; background: var(--muted); }
+#rf .cr.g .ct i { background: var(--dn); }
+#rf .cr.l .ct i { background: var(--up); }
+#rf .cr.tot .ct i { background: var(--ink); opacity: 0.55; }
+#rf .cr.tot .cn { font-weight: 500; }
+#rf .cr .cd, #rf .cr .cv { text-align: right; }
+#rf .cr .cd { color: var(--muted); }
+#rf .cinfo { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; margin: 12px 0 0; font-size: 11px; }
+#rf .cinfo dt { color: var(--muted); }
+#rf .cinfo dd { margin: 0; text-align: right; }
+
+#rf .mainTabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: thin; flex-shrink: 0; }
+#rf .mainTabs button { border: 0; background: transparent; padding: 10px 14px; font-size: 9.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+#rf .mainTabs button:hover { color: var(--ink); }
+#rf .mainTabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+#rf .panel { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+#rf .passBd h3 { font-size: 15px; margin: 18px 0 8px; color: var(--accent); }
+#rf .passCtl { display: grid; gap: 12px; }
+#rf .pbtns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+#rf .pbtns .spd { margin-left: auto; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
+#rf .pbtns .spd select { width: auto; padding: 5px 8px; }
+#rf .pslide .rng { width: 100%; accent-color: #fff; margin: 0; }
+#rf .ptime { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 2px; flex-wrap: wrap; gap: 4px 12px; }
+#rf .pfields { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+#rf .banner { margin: 14px 0; padding: 12px 14px; border: 1px solid var(--line); border-left-width: 4px; background: var(--bg); display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; }
+#rf .banner b { font-family: var(--f-display); font-weight: 400; letter-spacing: 0.08em; font-size: 18px; }
+#rf .banner.ok { border-left-color: var(--pass); } #rf .banner.ok b { color: var(--pass); }
+#rf .banner.no { border-left-color: var(--fail); } #rf .banner.no b { color: var(--fail); }
+#rf .banner.mid { border-left-color: var(--warn); } #rf .banner.mid b { color: var(--warn); }
+#rf .geoWrap { position: relative; width: 100%; height: 240px; }
+#rf .geoWrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+#rf .passGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 24px; align-items: start; }
+#rf .passGrid .pcol { min-width: 0; } #rf .passGrid h3 { margin-top: 4px; }
+#rf .pstats { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; margin: 0; font-size: 11.5px; }
+#rf .pstats dt { color: var(--muted); } #rf .pstats dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+#rf .pstats dt.sec { grid-column: 1 / -1; font-family: var(--f-display); letter-spacing: 0.1em; font-size: 14px; color: var(--accent); margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+#rf .pstats dt.sec:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+#rf .pstats.wide { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0 28px; }
+#rf .pstats.wide > div { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-bottom: 1px solid var(--line); }
+#rf .pstats.wide dt, #rf .pstats.wide dd { margin: 0; }
+#rf .pskyWrap { position: relative; width: 100%; max-width: 420px; aspect-ratio: 1 / 1; margin: 0 auto; }
+#rf .pskyWrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+/* small screens: panes stack and the whole app scrolls */
+@media (max-width: 1000px) {
+  #rf { flex-direction: column; overflow-y: auto; overflow-x: hidden; }
+  #rf .pane { overflow: visible; }
+  #rf .paneL, #rf .paneR { width: 100%; border: 0; border-bottom: 1px solid var(--line); }
+  #rf .paneM { flex: none; padding: 16px 14px 32px; }
+  #rf .paneL { order: 1; } #rf .paneM { order: 0; } #rf .paneR { order: 2; }
+}
+@media (max-width: 520px) {
+  #rf .cr { grid-template-columns: 1fr 44px 58px; } #rf .cr .ct { display: none; }
+  #rf .mainTabs button { padding: 10px 12px; }
+}
+@media (prefers-reduced-motion: reduce) { #rf * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+
+  <!-- ═══ NAV ═══ -->
+  <nav id="navbar" class="scrolled">
+    <div class="nav-inner">
+      <a href="/" class="nav-logo-link">
+        <img src="/assets/images/conon_logo_2.png" alt="Conon Labs" class="nav-logo" />
+      </a>
+      <ul class="nav-links">
+        <li><a href="/#about"    class="nav-link">About</a></li>
+        <li><a href="/#products" class="nav-link">Products</a></li>
+        <li><a href="/#services" class="nav-link">Services</a></li>
+        <li><a href="/#team"     class="nav-link">Team</a></li>
+        <li><a href="/#research" class="nav-link">Research</a></li>
+        <li><a href="/#contact"  class="nav-link">Contact</a></li>
+        <li><a href="/progress/"  class="nav-cta">Progress</a></li>
+        <li><a href="/interest/" class="nav-cta">Register Interest</a></li>
+        <li class="nav-dropdown">
+          <button class="nav-cta nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Apps</button>
+          <div class="nav-dropdown-menu">
+            <a href="/sat_track/" class="nav-dropdown-link">Sat Track</a>
+            <a href="/gs_calc/" class="nav-dropdown-link">GS Calc</a>
+            <a href="/rf_link/" class="nav-dropdown-link">RF-Link</a>
+          </div>
+        </li>
+      </ul>
+      <button class="hamburger" id="hamburger" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Mobile drawer -->
+  <div class="mobile-menu" id="mobileMenu">
+    <a href="/#about"    class="mob-link">About</a>
+    <a href="/#products" class="mob-link">Products</a>
+    <a href="/#services" class="mob-link">Services</a>
+    <a href="/#team"     class="mob-link">Team</a>
+    <a href="/#research" class="mob-link">Research</a>
+    <a href="/#contact"  class="mob-link">Contact</a>
+    <a href="/progress/"  class="mob-link">Progress</a>
+    <a href="/interest/" class="mob-link">Register Interest</a>
+    <span class="mob-apps-label">Apps</span>
+    <a href="/sat_track/" class="mob-link">Sat Track</a>
+    <a href="/gs_calc/"   class="mob-link">GS Calc</a>
+    <a href="/rf_link/"   class="mob-link">RF-Link</a>
+  </div>
+
+<div id="rf">
+  <aside class="pane paneL">
+    <div class="sbTitle"><h1>RF-LINK</h1><span class="tag">S-band ground dome: sky coverage and link closure for LEO passes</span></div>
+    <div class="setup">
+      <div class="sLabel">Setup</div>
+      <div class="sBtns"><button class="btn" id="saveSetup" type="button">Save setup</button><button class="btn" id="loadSetup" type="button">Load setup</button></div>
+      <input type="file" id="setupFile" accept=".json,application/json" hidden>
+      <div class="sMsg" id="setupMsg" role="status" aria-live="polite" hidden></div>
+    </div>
+    <div class="card">
+      <div class="hd"><h2>Link scenario</h2><button class="btn sm" id="resetLink" type="button">Reset</button></div>
+      <div id="linkGroups"></div>
+      <dl class="derived" id="derived"></dl>
+    </div>
+  </aside>
+
+  <section class="pane paneM">
+    <div class="chips" id="chips"></div>
+    <div class="card">
+      <div class="hd"><h2>Can it close the link?</h2><span class="sub" id="resultSub"></span></div>
+      <div class="bd">
+        <div class="kpis" id="kpis"></div>
+        <ul class="checks" id="checks"></ul>
+      </div>
+    </div>
+
+    <nav class="mainTabs" id="mainTabs" role="tablist" aria-label="Views">
+      <button type="button" role="tab" data-tab="cov" aria-selected="true">Coverage</button>
+      <button type="button" role="tab" data-tab="pass" aria-selected="false">Pass simulator</button>
+      <button type="button" role="tab" data-tab="chain" aria-selected="false">Link chain</button>
+      <button type="button" role="tab" data-tab="margin" aria-selected="false">Margins</button>
+      <button type="button" role="tab" data-tab="sat" aria-selected="false">Satellite</button>
+    </nav>
+    <div class="panel" id="p-cov">
+    <div class="card">
+      <div class="hd">
+        <div class="tabs" role="tablist">
+          <button type="button" role="tab" id="tabSky" aria-selected="true">Sky plot</button>
+          <button type="button" role="tab" id="tabDome" aria-selected="false">3D dome</button>
+        </div>
+        <div class="layerSel"><label for="layer">Layer</label><select id="layer"></select></div>
+      </div>
+      <div class="bd">
+        <div class="stage"><canvas id="sky"></canvas><canvas id="dome" hidden></canvas></div>
+        <div class="soloBar" id="soloBar"></div>
+        <div class="legend" id="legend"></div>
+        <div class="toggles">
+          <label><input type="checkbox" id="tgOutline" checked> Coverage outlines</label>
+          <label><input type="checkbox" id="tgBeam" checked> Beams (-3 dB)</label>
+          <label><input type="checkbox" id="tgBore" checked> Boresights</label>
+          <label><input type="checkbox" id="tgHatch" checked> Hatch gaps</label>
+          <label><input type="checkbox" id="tgModels" checked> 3D antenna models</label>
+        </div>
+        <div class="probe" id="probe" aria-live="polite"></div>
+      </div>
+    </div>
+
+    </div>
+    <div class="panel" id="p-pass" hidden>
+    <div class="card">
+      <div class="hd"><h2>Pass simulator</h2><span class="sub" id="passSub"></span></div>
+      <div class="bd passBd">
+        <div class="passCtl">
+          <div class="pbtns">
+            <button class="btn pri" id="pPlay" type="button">Play</button>
+            <button class="btn" id="pAos" type="button">Rise</button>
+            <button class="btn" id="pMax" type="button">Closest</button>
+            <button class="btn" id="pLos" type="button">Set</button>
+            <label class="spd">Speed <select id="pSpeed"><option value="10">10x</option><option value="30" selected>30x</option><option value="100">100x</option></select></label>
+          </div>
+          <div class="pslide"><input id="pSlider" class="rng" type="range" min="-1000" max="1000" step="1" value="-1000" aria-label="Satellite position along the pass"><div class="ptime" id="pTime"></div></div>
+          <div class="pfields" id="pFields"></div>
+        </div>
+        <div class="banner" id="pBanner" aria-live="polite"></div>
+        <div class="geoWrap" id="geoWrap"><canvas id="geo"></canvas></div>
+        <p class="sub" style="margin:4px 0 14px">Cross-section through the station, the satellite and the centre of the Earth. Vertical scale is the same as horizontal.</p>
+        <div class="passGrid">
+          <div class="pcol"><h3>At this position</h3><dl class="pstats" id="pStats"></dl>
+            <div class="row" style="margin-top:12px"><button class="btn" id="pChain" type="button">Open the link chain here</button></div></div>
+          <div class="pcol"><h3>Track across the sky</h3><div class="pskyWrap"><canvas id="pSky"></canvas></div><p class="sub" id="pSkyNote" style="margin:6px 0 0">Coloured stretches show which ground antenna closes the link. Grey stretches do not close.</p></div>
+        </div>
+        <h3>Margin over target during the pass</h3><div class="cl" id="pMarginLeg"></div><div class="chartWrap"><canvas id="pMargin"></canvas></div>
+        <h3>Doppler shift</h3><div class="cl" id="pDopLeg"></div><div class="chartWrap"><canvas id="pDop"></canvas></div>
+        <h3>Distance and elevation</h3><div class="cl" id="pRangeLeg"></div><div class="chartWrap"><canvas id="pRange"></canvas></div>
+        <h3>Whole pass, added up</h3><dl class="pstats wide" id="pSummary"></dl>
+        <p class="sub" id="pNote" style="margin:8px 0 0"></p>
+      </div>
+    </div>
+    </div>
+    <div class="panel" id="p-chain" hidden>
+    <div class="card">
+      <div class="hd"><h2>Link chain in one direction</h2><span class="sub" id="chainDir"></span><button class="btn sm" id="chainWorst" type="button" hidden>Back to weakest</button></div>
+      <div class="bd" id="chain"></div>
+    </div>
+
+    </div>
+    <div class="panel" id="p-margin" hidden>
+    <div class="card">
+      <div class="hd"><h2>Link margin by elevation</h2></div>
+      <div class="bd">
+        <div class="cl" id="chartLegend"></div>
+        <div class="chartWrap"><canvas id="chart"></canvas></div>
+        <p class="sub" id="chartNote" style="margin:8px 0 0"></p>
+      </div>
+    </div>
+
+    </div>
+    <div class="panel" id="p-sat" hidden>
+    <div class="card">
+      <div class="hd"><h2>Satellite antenna options</h2></div>
+      <div class="bd">
+        <div class="cl" id="satLegend"></div>
+        <div class="chartWrap"><canvas id="satChart"></canvas></div>
+        <p class="sub" id="satNote" style="margin:8px 0 0"></p>
+      </div>
+    </div>
+    </div>
+
+    <footer class="foot">
+      <p>Model notes. Beams are cosine-power patterns matched to the -3 dB beamwidths, with a floor for sidelobes and back radiation. Antennas are switched, one best antenna per direction, with no combining. Polarisation loss is a flat table (0.5 dB circular match, 3 dB circular to linear or linear to linear, 20 dB opposite circular). Rain adds sky noise as well as loss. The two-QHA satellite option includes 3 dB of splitter loss. Nothing models terrain, mounting structure, ground reflections or antenna coupling. Each ground antenna has its own Pluto, PA, diplexer and LNA. Noise is referred to the antenna terminal: antenna temperature (sky and ground weighted by the pattern), feed loss, diplexer, LNA and Pluto noise figure. The satellite is either nadir-pointed or tumbling, and a tumbling satellite is planned at a percentile of random orientations.</p>
+      <p>Coding gains and required Eb/N0 are for a bit error rate of 1e-5. Atmospheric loss scales the zenith value by air mass.</p>
+    </footer>
+  </section>
+
+  <aside class="pane paneR">
+    <div class="card">
+      <div class="hd"><h2>Antenna stack</h2><span class="sub" id="antCount"></span></div>
+      <div class="tools">
+        <select id="addType" class="txt" style="width:auto;flex:1 1 140px" aria-label="Antenna type to add"></select>
+        <button class="btn pri" id="addOne" type="button">Add one</button>
+      </div>
+      <div class="ring">
+        <div class="fld"><label for="ringN">Ring count</label><div class="inp"><input id="ringN" type="text" inputmode="numeric" value="6"></div></div>
+        <div class="fld"><label for="ringEl">Ring elevation</label><div class="inp"><input id="ringEl" type="text" inputmode="decimal" value="20"><span class="unit">°</span></div></div>
+        <div class="fld"><label for="ringOff">First azimuth</label><div class="inp"><input id="ringOff" type="text" inputmode="decimal" value="0"><span class="unit">°</span></div></div>
+        <div class="fld" style="align-self:end"><button class="btn" id="addRing" type="button" style="width:100%">Add ring</button></div>
+        <div class="err full" id="ringErr" style="color:var(--fail);font-size:11px" hidden></div>
+      </div>
+      <div class="tools" style="border-bottom:0;padding-bottom:0">
+        <button class="btn sm" id="resetAnts" type="button">Reset example</button>
+        <button class="btn sm danger" id="clearAnts" type="button">Remove all</button>
+      </div>
+      <div class="msg" id="antMsg" hidden></div>
+      <div class="alist" id="alist"></div>
+    </div>
+    <div class="card">
+      <div class="hd"><h2>Selected antenna</h2></div>
+      <div class="edit" id="editor"></div>
+    </div>
+  </aside>
+</div>
+
+<script src="/assets/js/main.js"></script>
+<script>
+/* RF-Link engine v2: pure functions, no DOM.
+   Sky grid: azimuth 0..358 step 2 deg (NA=180), elevation 0..90 step 1 deg (NE=91). Index = ie*NA + ia.
+   Directions are local ENU unit vectors (x east, y north, z up).
+   Margins are per antenna: downlink uses G/T, uplink uses EIRP from the antenna's own Pluto + PA chain. */
+var Engine = (function () {
+  'use strict';
+  var NA = 180, NE = 91, DAZ = 2, N = NA * NE;
+  var D2R = Math.PI / 180, R2D = 180 / Math.PI;
+  var RE = 6371;            // km
+  var KDB = -228.599;       // Boltzmann constant, dBW/Hz/K
+  var log10 = Math.log10;
+  function p10(x) { return Math.pow(10, x / 10); }
+  function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+
+  var DX = new Float32Array(N), DY = new Float32Array(N), DZ = new Float32Array(N), WGT = new Float32Array(NE);
+  (function () {
+    for (var ie = 0; ie < NE; ie++) {
+      var e = ie * D2R, ce = Math.cos(e), se = Math.sin(e);
+      WGT[ie] = ce;
+      for (var ia = 0; ia < NA; ia++) {
+        var a = ia * DAZ * D2R, i = ie * NA + ia;
+        DX[i] = ce * Math.sin(a); DY[i] = ce * Math.cos(a); DZ[i] = se;
+      }
+    }
+  })();
+
+  /* ---------- Reference tables ---------- */
+  var MODS = {
+    bpsk: { label: 'BPSK (coherent)', ebn0: 9.6, bps: 1, bwf: 1.35 },
+    qpsk: { label: 'QPSK / OQPSK', ebn0: 9.6, bps: 2, bwf: 1.35 },
+    gmsk: { label: 'GMSK (BT 0.5)', ebn0: 10.3, bps: 1, bwf: 1.0 },
+    fsk: { label: '2-FSK (non-coherent)', ebn0: 13.4, bps: 1, bwf: 2.0 }
+  };
+  var CODES = {
+    none: { label: 'Uncoded', gain: 0, rate: 1 },
+    conv: { label: 'Convolutional K=7, rate 1/2', gain: 5.1, rate: 0.5 },
+    rsconv: { label: 'Reed-Solomon (255,223) + conv', gain: 7.2, rate: 0.4373 },
+    ldpc: { label: 'LDPC rate 1/2', gain: 8.1, rate: 0.5 }
+  };
+  var POLS = { RHCP: 'RHCP', LHCP: 'LHCP', LIN: 'Linear' };
+
+  var PRESETS = {
+    patch: { label: 'Patch', kind: 'beam', gain: 7, bwH: 75, bwV: 75, floor: 15, pol: 'RHCP',
+      blurb: 'Flat, low profile, around 7 dBi. Good for mid elevations, weak near the horizon when pointed at zenith.' },
+    qha: { label: 'Quadrifilar helix', kind: 'beam', gain: 3.5, bwH: 135, bwV: 135, floor: 12, pol: 'RHCP',
+      blurb: 'Nearly hemispherical circular-polarised beam. Low gain, but one unit sees most of the sky.' },
+    helix: { label: 'Axial helix (6 turns)', kind: 'beam', gain: 12, bwH: 48, bwV: 48, floor: 20, pol: 'RHCP',
+      blurb: 'Medium-gain circular-polarised beam. Good for low-elevation rings.' },
+    yagi: { label: 'Yagi (8 element)', kind: 'beam', gain: 12, bwH: 44, bwV: 48, floor: 20, pol: 'LIN',
+      blurb: 'Linear polarisation, so it loses about 3 dB to a circularly polarised satellite.' },
+    turnstile: { label: 'Turnstile over ground plane', kind: 'beam', gain: 5, bwH: 85, bwV: 85, floor: 12, pol: 'RHCP',
+      blurb: 'Crossed dipoles above a ground plane. Broad circular-polarised beam.' },
+    horn: { label: 'Pyramidal horn', kind: 'beam', gain: 15, bwH: 30, bwV: 32, floor: 20, pol: 'LIN',
+      blurb: 'Clean, predictable beam with low sidelobes. Physically large at S-band.' },
+    dish: { label: 'Parabolic dish (0.6 m)', kind: 'beam', gain: 20, bwH: 16, bwV: 16, floor: 28, pol: 'RHCP',
+      blurb: 'Narrow beam. Needs pointing, but closes the hardest links.' },
+    dipole: { label: 'Half-wave dipole', kind: 'axis', gain: 2.15, bwH: 78, bwV: 360, floor: 25, pol: 'LIN',
+      blurb: 'Donut pattern around its axis. The boresight is the axis direction, so gain peaks 90 degrees away from it.' },
+    monopole: { label: 'Ground-plane monopole', kind: 'axish', gain: 4, bwH: 78, bwV: 360, floor: 25, pol: 'LIN',
+      blurb: 'Vertical whip on a ground plane. It radiates into the hemisphere above the plane only. Point the axis at zenith (elevation 90) for horizon-hugging gain.' },
+    custom: { label: 'Custom beam', kind: 'beam', gain: 8, bwH: 70, bwV: 70, floor: 15, pol: 'RHCP',
+      blurb: 'Start from generic values and set your own gain and beamwidths.' }
+  };
+
+  /* Satellite antenna options. gain is the peak (edge for isoflux) in dBi, bw the -3 dB beamwidth. */
+  var SATS = {
+    whip: { label: 'Whip or dipole', kind: 'axis', gain: 1, bw: 78, floor: 20, nadirOnly: false, pol: 'LIN',
+      blurb: 'Simplest and needs no pointing. Deep nulls along its axis, so a tumbling satellite loses several dB.' },
+    turn: { label: 'Turnstile', kind: 'beam', gain: 2.5, bw: 150, floor: 10, nadirOnly: false, pol: 'RHCP',
+      blurb: 'Circular polarisation over one hemisphere. Wide beam, low gain.' },
+    qha: { label: 'Quadrifilar helix', kind: 'beam', gain: 3.5, bw: 135, floor: 12, nadirOnly: false, pol: 'RHCP',
+      blurb: 'Circular polarisation over one hemisphere, with good gain toward the horizon.' },
+    dual: { label: 'Two QHAs, top and bottom', kind: 'dual', gain: 3.5, bw: 135, floor: 12, nadirOnly: false, pol: 'RHCP',
+      blurb: 'Covers nearly the whole sphere. The usual answer when attitude is not controlled. Costs two antennas and a splitter, and the model charges 3 dB for the splitter.' },
+    patch: { label: 'Patch, nadir-pointed', kind: 'beam', gain: 6, bw: 80, floor: 15, nadirOnly: true, pol: 'RHCP',
+      blurb: 'Best gain at nadir but loses about 10 dB at low elevation, and useless if the satellite tumbles.' },
+    iso: { label: 'Isoflux (shaped beam)', kind: 'iso', gain: 4, bw: 0, floor: 25, nadirOnly: true, pol: 'RHCP',
+      blurb: 'Gain rises off nadir to cancel range loss. Best for a pointed satellite, but a custom antenna. Gain here is the value at the mask elevation.' },
+    custom: { label: 'Custom beam', kind: 'beam', gain: 5, bw: 100, floor: 15, nadirOnly: false, pol: 'RHCP',
+      blurb: 'Set your own peak gain and beamwidth.' }
+  };
+
+  var LIMITS = {
+    altKm: { min: 300, max: 1200, unit: 'km', label: 'Orbit altitude', step: 10, hint: 'The highest altitude is the worst case for range.' },
+    passEl: { min: 1, max: 90, unit: '°', label: 'Pass peak elevation', step: 1, hint: 'How high the satellite climbs. 90 is straight overhead. Low passes are short and far away.' },
+    az0: { min: 0, max: 360, unit: '°', label: 'Bearing at closest approach', step: 5, hint: 'Where the track passes the station. For an overhead pass the satellite travels across this bearing.' },
+    mask: { min: 0, max: 60, unit: '°', label: 'Minimum elevation', step: 1 },
+    fDn: { min: 2000, max: 2500, unit: 'MHz', label: 'Downlink frequency', step: 5 },
+    fUp: { min: 2000, max: 2500, unit: 'MHz', label: 'Uplink frequency', step: 5 },
+    rateDn: { min: 0.1, max: 2000, unit: 'kbps', label: 'Downlink data rate', log: true },
+    rateUp: { min: 0.1, max: 2000, unit: 'kbps', label: 'Uplink data rate', log: true },
+    implLoss: { min: 0, max: 6, unit: 'dB', label: 'Implementation loss', step: 0.1 },
+    target: { min: 0, max: 20, unit: 'dB', label: 'Required link margin', step: 0.5 },
+    tumbleP: { min: 50, max: 99, unit: '%', label: 'Orientation coverage when tumbling', step: 1, hint: 'Share of random orientations that must still close the link.' },
+    satGain: { min: -5, max: 25, unit: 'dBi', label: 'Antenna gain (peak)', step: 0.5 },
+    satBw: { min: 20, max: 180, unit: '°', label: 'Beamwidth (-3 dB)', step: 5 },
+    satPtxW: { min: 0.1, max: 50, unit: 'W', label: 'Transmit power', log: true },
+    satLoss: { min: 0, max: 6, unit: 'dB', label: 'Feed and filter loss', step: 0.1 },
+    satPointLoss: { min: 0, max: 10, unit: 'dB', label: 'Pointing and misc. loss', step: 0.5 },
+    satNF: { min: 0.5, max: 6, unit: 'dB', label: 'Receiver noise figure', step: 0.1 },
+    satTa: { min: 50, max: 350, unit: 'K', label: 'Antenna temperature (sees Earth)', step: 5 },
+    sdrTx: { min: -10, max: 10, unit: 'dBm', label: 'Pluto Tx output', step: 0.5 },
+    sdrNF: { min: 1, max: 8, unit: 'dB', label: 'Pluto Rx noise figure', step: 0.1 },
+    lnaNF: { min: 0.3, max: 4, unit: 'dB', label: 'LNA noise figure', step: 0.1 },
+    lnaGain: { min: 0, max: 40, unit: 'dB', label: 'LNA gain', step: 0.5 },
+    dipLoss: { min: 0, max: 4, unit: 'dB', label: 'Diplexer loss', step: 0.1 },
+    atmZenith: { min: 0, max: 0.5, unit: 'dB', label: 'Atmosphere at zenith', step: 0.01 },
+    rain: { min: 0, max: 6, unit: 'dB', label: 'Rain and weather', step: 0.1 },
+    misc: { min: 0, max: 6, unit: 'dB', label: 'Ionosphere and other', step: 0.1 }
+  };
+  var ALIM = {
+    az: { min: 0, max: 360, unit: '°', label: 'Azimuth' },
+    el: { min: 0, max: 90, unit: '°', label: 'Elevation' },
+    roll: { min: -180, max: 180, unit: '°', label: 'Roll about boresight' },
+    gain: { min: -5, max: 35, unit: 'dBi', label: 'Peak gain' },
+    bwH: { min: 10, max: 180, unit: '°', label: 'Beamwidth H (-3 dB)' },
+    bwV: { min: 10, max: 180, unit: '°', label: 'Beamwidth V (-3 dB)' },
+    floor: { min: 5, max: 40, unit: 'dB', label: 'Sidelobe and back level' },
+    feed: { min: 0, max: 6, unit: 'dB', label: 'Feed and cable loss' },
+    paGain: { min: 0, max: 50, unit: 'dB', label: 'PA gain' },
+    paMax: { min: 0.01, max: 100, unit: 'W', label: 'PA max output' }
+  };
+
+  var PALETTE = ['#e69f00', '#2f9de4', '#00a37a', '#d55e00', '#a06ad6', '#e0559a', '#8ab400', '#00b3c6', '#c77d3a', '#6674e6', '#d9b300', '#7a8b99'];
+  var MAX_ANTS = 16;
+  var SPLIT_LOSS = 3;       // dB, power split between the two antennas of the top and bottom pair
+
+  function defaultLink() {
+    return {
+      altKm: 550, mask: 15, passEl: 60, az0: 90, fDn: 2200, fUp: 2050, rateDn: 50, rateUp: 50,
+      mod: 'bpsk', coding: 'rsconv', implLoss: 2, target: 3, need: 'both',
+      satType: 'iso', satAtt: 'nadir', tumbleP: 80, satGain: 4, satBw: 135, satPtxW: 2,
+      satLoss: 0.5, satPointLoss: 1, satNF: 1, satTa: 270, satPol: 'RHCP',
+      sdrTx: 0, sdrNF: 3.5, lnaNF: 0.6, lnaGain: 25, dipLoss: 0.4,
+      atmZenith: 0.05, rain: 0.5, misc: 0.5
+    };
+  }
+  function mkAnt(type, S, over) {
+    var p = PRESETS[type] || PRESETS.custom;
+    var id = S.nextId++;
+    var a = {
+      id: id, name: p.label + ' ' + id, type: type, color: PALETTE[id % PALETTE.length],
+      az: 0, el: 90, roll: 0, gain: p.gain, bwH: p.bwH, bwV: p.bwV, floor: p.floor, pol: p.pol,
+      feed: 0.5, paGain: 35, paMax: 10, enabled: true, outline: true
+    };
+    if (over) for (var k in over) a[k] = over[k];
+    return a;
+  }
+  function defaultState() {
+    var S = { link: defaultLink(), ants: [], nextId: 1 };
+    /* Reference design: one zenith helix and a ring of eight at 35 degrees, each with its own low-loss feed, LNA and 5 W PA. */
+    var ant = { feed: 0.2, paGain: 37, paMax: 5 };
+    S.ants.push(mkAnt('helix', S, Object.assign({ name: 'Zenith helix', az: 0, el: 90 }, ant)));
+    for (var i = 0; i < 8; i++) S.ants.push(mkAnt('helix', S, Object.assign({ name: 'Ring helix ' + (i + 1), az: i * 45, el: 35 }, ant)));
+    return S;
+  }
+
+  /* ---------- Ground antennas ---------- */
+  function kindOf(a) { var p = PRESETS[a.type]; return p ? p.kind : 'beam'; }
+  /* 'axis' is a full donut about its axis (dipole). 'axish' is the same pattern over one hemisphere only (monopole on a ground plane). */
+  function isAxis(kind) { return kind === 'axis' || kind === 'axish'; }
+  function nFromBw(bw) {
+    var x = Math.cos(bw * D2R / 2);
+    if (x <= 0.01) return 0.05;
+    return Math.max(0.05, Math.log(0.5) / Math.log(x));
+  }
+  function frame(a) {
+    var az = a.az * D2R, el = a.el * D2R, ce = Math.cos(el);
+    var b = [ce * Math.sin(az), ce * Math.cos(az), Math.sin(el)];
+    var h = [Math.cos(az), -Math.sin(az), 0];
+    var v = [h[1] * b[2] - h[2] * b[1], h[2] * b[0] - h[0] * b[2], h[0] * b[1] - h[1] * b[0]];
+    var r = a.roll * D2R, cr = Math.cos(r), sr = Math.sin(r);
+    return {
+      b: b,
+      h: [h[0] * cr + v[0] * sr, h[1] * cr + v[1] * sr, h[2] * cr + v[2] * sr],
+      v: [-h[0] * sr + v[0] * cr, -h[1] * sr + v[1] * cr, -h[2] * sr + v[2] * cr]
+    };
+  }
+  function relDb(kind, floor, cx, px, py, nx, ny) {
+    var rel;
+    if (isAxis(kind)) {
+      if (kind === 'axish' && cx < 0) return -floor;
+      var s2 = 1 - cx * cx;
+      if (s2 < 1e-8) return -floor;
+      var f = Math.cos(Math.PI / 2 * cx) / Math.sqrt(s2);
+      rel = 20 * log10(Math.abs(f) + 1e-9);
+    } else {
+      if (cx <= 1e-6) return -floor;
+      var s = px * px + py * py;
+      var n = s > 1e-9 ? (nx * px * px + ny * py * py) / s : nx;
+      rel = n * 10 * log10(cx);
+    }
+    return rel < -floor ? -floor : rel;
+  }
+  function polLossDb(ap, sp) {
+    var acp = ap !== 'LIN', scp = sp !== 'LIN';
+    if (acp && scp) return ap === sp ? 0.5 : 20;
+    return 3;
+  }
+  /* Directivity of the antenna's own pattern (cosine-power beam or dipole donut, with its floor), by numerical
+     integration over the sphere. Gain cannot exceed this, so it is the limit the checks use. */
+  var dirCache = {}, dirCount = 0;
+  function modelDirectivity(a) {
+    var kind = kindOf(a), key = kind + '|' + a.bwH + '|' + a.bwV + '|' + a.floor;
+    if (dirCache[key] != null) return dirCache[key];
+    var nx = nFromBw(a.bwH), ny = nFromBw(a.bwV), sum = 0, dth = 0.5, dph = 10;
+    for (var th = dth / 2; th < 180; th += dth) {
+      var t = th * D2R, cx = Math.cos(t), st = Math.sin(t), ring = 0;
+      for (var ph = dph / 2; ph < 360; ph += dph) {
+        var p = ph * D2R;
+        ring += p10(relDb(kind, a.floor, cx, st * Math.cos(p), st * Math.sin(p), nx, ny));
+      }
+      sum += ring * dph * D2R * st * dth * D2R;
+    }
+    var d = 10 * log10(4 * Math.PI / sum);
+    if (dirCount++ > 300) { dirCache = {}; dirCount = 0; }
+    return (dirCache[key] = d);
+  }
+  /* Gain may sit up to 5 dB under the pattern's directivity (efficiency and losses) and at most 0.5 dB over it. */
+  function antCheck(a) {
+    var d = modelDirectivity(a), delta = a.gain - d;
+    return { ok: delta >= -5 && delta <= 0.5, dEst: d, delta: delta };
+  }
+  /* Net gain toward each grid direction: peak gain + pattern - polarisation loss - feed loss. */
+  function antGainGrid(a, satPol) {
+    var g = new Float32Array(N), f = frame(a), kind = kindOf(a);
+    var nx = nFromBw(a.bwH), ny = nFromBw(a.bwV);
+    var off = a.gain - polLossDb(a.pol, satPol) - a.feed;
+    var b = f.b, h = f.h, v = f.v;
+    for (var i = 0; i < N; i++) {
+      var dx = DX[i], dy = DY[i], dz = DZ[i];
+      var cx = dx * b[0] + dy * b[1] + dz * b[2];
+      var px = dx * h[0] + dy * h[1] + dz * h[2];
+      var py = dx * v[0] + dy * v[1] + dz * v[2];
+      g[i] = off + relDb(kind, a.floor, cx, px, py, nx, ny);
+    }
+    return g;
+  }
+  function cutCurve(a, phiDeg) {
+    var kind = kindOf(a), nx = nFromBw(a.bwH), ny = nFromBw(a.bwV), out = [];
+    for (var t = -180; t <= 180; t += 2) {
+      var ph = (t < 0 ? phiDeg + 180 : phiDeg) * D2R, th = Math.abs(t) * D2R;
+      var cx = Math.cos(th), px = Math.sin(th) * Math.cos(ph), py = Math.sin(th) * Math.sin(ph);
+      out.push({ th: t, rel: relDb(kind, a.floor, cx, px, py, nx, ny) });
+    }
+    return out;
+  }
+  function beamOutline(a, levelDb) {
+    if (isAxis(kindOf(a)) || a.floor <= levelDb + 0.5) return [];
+    var f = frame(a), nx = nFromBw(a.bwH), ny = nFromBw(a.bwV), pts = [];
+    for (var p = 0; p <= 360; p += 6) {
+      var ph = p * D2R, c = Math.cos(ph), s = Math.sin(ph);
+      var n = nx * c * c + ny * s * s;
+      var ct = Math.pow(10, -levelDb / (10 * n)), st = Math.sqrt(Math.max(0, 1 - ct * ct));
+      pts.push([
+        ct * f.b[0] + st * (c * f.h[0] + s * f.v[0]),
+        ct * f.b[1] + st * (c * f.h[1] + s * f.v[1]),
+        ct * f.b[2] + st * (c * f.h[2] + s * f.v[2])
+      ]);
+    }
+    return pts;
+  }
+
+  /* ---------- Geometry and propagation ---------- */
+  function slantKm(elDeg, h) {
+    var e = elDeg * D2R, r = RE + h;
+    return Math.sqrt(r * r - Math.pow(RE * Math.cos(e), 2)) - RE * Math.sin(e);
+  }
+  function fsplDb(fMHz, dKm) { return 32.44 + 20 * log10(dKm) + 20 * log10(fMHz); }
+  function airmass(elDeg) { return 1 / (Math.sin(elDeg * D2R) + 0.50572 * Math.pow(elDeg + 6.07995, -1.6364)); }
+  function etaOfElev(elDeg, h) { return Math.asin(clamp(RE * Math.cos(elDeg * D2R) / (RE + h), 0, 1)) * R2D; }
+  function nadirToRange(etaDeg, h) {
+    var r = RE + h, e = etaDeg * D2R, s = r * Math.sin(e);
+    if (s >= RE) return null;
+    return r * Math.cos(e) - Math.sqrt(RE * RE - s * s);
+  }
+  function reqEbN0(L) { return MODS[L.mod].ebn0 - CODES[L.coding].gain; }
+  function occBw(L, rateKbps) {
+    var m = MODS[L.mod], c = CODES[L.coding];
+    return rateKbps * 1000 / (m.bps * c.rate) * m.bwf;
+  }
+
+  /* ---------- Ground receive and transmit chain, per antenna ---------- */
+  /* Antenna temperature: pattern-weighted sky (cosmic plus atmosphere) above the horizon, 290 K ground below. */
+  function antennaTemp(a, L) {
+    var f = frame(a), kind = kindOf(a), nx = nFromBw(a.bwH), ny = nFromBw(a.bwV), num = 0, den = 0;
+    for (var el = -87.5; el <= 87.5; el += 5) {
+      var e = el * D2R, ce = Math.cos(e), se = Math.sin(e);
+      var Lsky = p10(L.atmZenith * airmass(Math.max(el, 0)) + L.rain);   // atmosphere plus rain, as a power ratio
+      var Tsky = el >= 0 ? 6 / Lsky + 275 * (1 - 1 / Lsky) : 290;
+      for (var az = 0; az < 360; az += 10) {
+        var t = az * D2R, dx = ce * Math.sin(t), dy = ce * Math.cos(t);
+        var cx = dx * f.b[0] + dy * f.b[1] + se * f.b[2];
+        var px = dx * f.h[0] + dy * f.h[1] + se * f.h[2];
+        var py = dx * f.v[0] + dy * f.v[1] + se * f.v[2];
+        var g = p10(relDb(kind, a.floor, cx, px, py, nx, ny)) * ce;
+        num += g * Tsky; den += g;
+      }
+    }
+    return num / den;
+  }
+  /* All noise is referred to the point after the feed cable, the same point the net gain refers to. */
+  function chainScalars(a, L, Ta) {
+    var Lf = p10(a.feed), Ld = p10(L.dipLoss), Fl = p10(L.lnaNF), Fs = p10(L.sdrNF), Gl = p10(L.lnaGain);
+    var Tl = 290 * (Fl - 1), Ts = 290 * (Fs - 1);
+    var Tchain = 290 * (Ld - 1) + Ld * (Tl + Ts / Gl);
+    var Tsys = Ta / Lf + 290 * (1 - 1 / Lf) + Tchain;
+    var driveDbm = L.sdrTx + a.paGain, maxDbm = 10 * log10(a.paMax * 1000);
+    var poutDbm = Math.min(driveDbm, maxDbm);
+    return { Ta: Ta, Tsys: Tsys, Tchain: Tchain, driveDbm: driveDbm, maxDbm: maxDbm, poutDbm: poutDbm, poutDbw: poutDbm - 30, compressed: driveDbm > maxDbm + 0.05 };
+  }
+
+  /* ---------- Satellite antenna ---------- */
+  /* Directivity of a satellite beam pattern (cosine power with floor), same idea as the ground antennas. */
+  function satBeamD(bw, floor) {
+    var n = nFromBw(bw), sum = 0, dth = 0.25;
+    for (var th = dth / 2; th < 180; th += dth) {
+      var c = Math.cos(th * D2R), rel = c <= 1e-6 ? -floor : Math.max(-floor, n * 10 * log10(c));
+      sum += p10(rel) * Math.sin(th * D2R) * dth * D2R;
+    }
+    return 10 * log10(2 / sum);
+  }
+  function satCheck(L) {
+    var t = SATS[L.satType] || SATS.custom;
+    if (t.kind === 'beam' || t.kind === 'dual') {
+      var d = satBeamD(L.satBw, t.floor), delta = L.satGain - d;
+      return { ok: delta >= -5 && delta <= 0.5, dEst: d, delta: delta };
+    }
+    return { ok: true, dEst: null, delta: 0 };
+  }
+  function satPeak(L) {
+    var t = SATS[L.satType] || SATS.custom;
+    if (t.kind === 'beam' || t.kind === 'dual') return Math.min(L.satGain, satBeamD(L.satBw, t.floor) + 0.5);
+    return L.satGain;
+  }
+  /* Gain in dBi at theta degrees off the antenna axis (0..180). */
+  function satGainAt(L, th, sat) {
+    var t = sat || SATS[L.satType] || SATS.custom, kind = t.kind, peak = (sat ? L.satGain : satPeak(L));
+    var floor = t.floor;
+    if (kind === 'iso') {
+      var etaE = etaOfElev(L.mask, L.altKm), dE = nadirToRange(etaE, L.altKm);
+      if (th <= etaE) { var d = nadirToRange(th, L.altKm); return peak + 20 * log10((d == null ? dE : d) / dE); }
+      return peak - Math.min(floor, 3 * (th - etaE));
+    }
+    var c = Math.cos(th * D2R);
+    if (kind === 'axis') {
+      var s2 = 1 - c * c, rel = s2 < 1e-8 ? -floor : 20 * log10(Math.abs(Math.cos(Math.PI / 2 * c) / Math.sqrt(s2)) + 1e-9);
+      return peak + Math.max(rel, -floor);
+    }
+    var thf = kind === 'dual' ? Math.min(th, 180 - th) : th, cc = Math.cos(thf * D2R);
+    var r2 = cc <= 1e-6 ? -floor : nFromBw(L.satBw) * 10 * log10(cc);
+    return peak + Math.max(r2, -floor) - (kind === 'dual' ? SPLIT_LOSS : 0);
+  }
+  /* Gain exceeded over a fraction p of a uniformly random orientation. */
+  function tumbleGain(L) {
+    var arr = [], tot = 0, th;
+    for (th = 0; th <= 180; th += 0.5) { var w = Math.sin(th * D2R) + 1e-6; arr.push([satGainAt(L, th), w]); tot += w; }
+    arr.sort(function (x, y) { return y[0] - x[0]; });
+    var acc = 0, target = L.tumbleP / 100 * tot;
+    for (var i = 0; i < arr.length; i++) { acc += arr[i][1]; if (acc >= target) return arr[i][0]; }
+    return arr[arr.length - 1][0];
+  }
+  /* Effective satellite antenna gain toward the ground station at each ground elevation. */
+  function satCurve(L) {
+    var out = new Float32Array(NE), t = SATS[L.satType] || SATS.custom;
+    if (L.satAtt === 'nadir' && t.kind !== 'axis') {
+      for (var ie = 0; ie < NE; ie++) out[ie] = satGainAt(L, etaOfElev(ie, L.altKm));
+    } else out.fill(tumbleGain(L));
+    return out;
+  }
+  function satOptionCurves(L) {
+    var res = {};
+    Object.keys(SATS).forEach(function (k) {
+      var t = SATS[k], L2 = Object.assign({}, L, { satType: k, satGain: t.gain, satBw: t.bw || L.satBw });
+      res[k] = satCurve(L2);
+    });
+    return res;
+  }
+  function satTsys(L) {
+    var Ls = p10(L.satLoss), F = p10(L.satNF);
+    return L.satTa / Ls + 290 * (1 - 1 / Ls) + 290 * (F - 1);
+  }
+
+  /* ---------- Link budget ---------- */
+  /* Per-elevation terms with the ground antenna left out:
+       downlink margin = dn[ie] + G/T of the ground antenna (dB/K)
+       uplink margin   = up[ie] + EIRP of the ground antenna (dBW)                          */
+  function linkBases(L, satCur) {
+    var dn = new Float32Array(NE), up = new Float32Array(NE), slant = new Float32Array(NE),
+      fd = new Float32Array(NE), fu = new Float32Array(NE), atm = new Float32Array(NE);
+    var reqEff = reqEbN0(L) + L.implLoss;
+    var psat = 10 * log10(L.satPtxW);
+    var Tsat = satTsys(L);
+    var rDn = 10 * log10(L.rateDn * 1000), rUp = 10 * log10(L.rateUp * 1000);
+    for (var ie = 0; ie < NE; ie++) {
+      var d = slantKm(ie, L.altKm), gs = satCur[ie];
+      slant[ie] = d; fd[ie] = fsplDb(L.fDn, d); fu[ie] = fsplDb(L.fUp, d);
+      atm[ie] = L.atmZenith * airmass(ie);
+      var prop = atm[ie] + L.rain + L.misc;
+      var eirpSat = psat - L.satLoss - L.satPointLoss + gs;
+      dn[ie] = eirpSat - fd[ie] - prop - KDB - rDn - reqEff;
+      up[ie] = -fu[ie] - prop + gs - L.satLoss - L.satPointLoss - 10 * log10(Tsat) - KDB - rUp - reqEff;
+    }
+    return { dn: dn, up: up, slant: slant, fd: fd, fu: fu, atm: atm, reqEff: reqEff, psat: psat, Tsat: Tsat, rDn: rDn, rUp: rUp };
+  }
+
+  /* ---------- Marching squares on the (az, el) grid ---------- */
+  function contour(F, th) {
+    var segs = [];
+    for (var ie = 0; ie < NE - 1; ie++) {
+      for (var ia = 0; ia < NA; ia++) {
+        var ia2 = (ia + 1) % NA;
+        var v0 = F[ie * NA + ia] - th, v1 = F[ie * NA + ia2] - th, v2 = F[(ie + 1) * NA + ia2] - th, v3 = F[(ie + 1) * NA + ia] - th;
+        var c = (v0 >= 0 ? 1 : 0) | (v1 >= 0 ? 2 : 0) | (v2 >= 0 ? 4 : 0) | (v3 >= 0 ? 8 : 0);
+        if (c === 0 || c === 15) continue;
+        var pt = function (e) {
+          if (e === 0) return [ia + v0 / (v0 - v1), ie];
+          if (e === 1) return [ia + 1, ie + v1 / (v1 - v2)];
+          if (e === 2) return [ia + v3 / (v3 - v2), ie + 1];
+          return [ia, ie + v0 / (v0 - v3)];
+        };
+        var B0 = 0, R1 = 1, T2 = 2, L3 = 3, pairs;
+        var ctr = (v0 + v1 + v2 + v3) / 4 >= 0;
+        switch (c) {
+          case 1: pairs = [[L3, B0]]; break;
+          case 2: pairs = [[B0, R1]]; break;
+          case 3: pairs = [[L3, R1]]; break;
+          case 4: pairs = [[R1, T2]]; break;
+          case 5: pairs = ctr ? [[B0, R1], [T2, L3]] : [[L3, B0], [R1, T2]]; break;
+          case 6: pairs = [[B0, T2]]; break;
+          case 7: pairs = [[L3, T2]]; break;
+          case 8: pairs = [[T2, L3]]; break;
+          case 9: pairs = [[T2, B0]]; break;
+          case 10: pairs = ctr ? [[L3, B0], [R1, T2]] : [[B0, R1], [T2, L3]]; break;
+          case 11: pairs = [[R1, T2]]; break;
+          case 12: pairs = [[L3, R1]]; break;
+          case 13: pairs = [[B0, R1]]; break;
+          default: pairs = [[L3, B0]];
+        }
+        for (var k = 0; k < pairs.length; k++) {
+          var p = pt(pairs[k][0]), q = pt(pairs[k][1]);
+          segs.push(p[0], p[1], q[0], q[1]);
+        }
+      }
+    }
+    return segs;
+  }
+
+  /* ---------- Whole-scenario compute ---------- */
+  function compute(S) {
+    var L = S.link, ants = S.ants, K = ants.length, k, i, ie, ia;
+    var satCur = satCurve(L), B = linkBases(L, satCur);
+    var rd = L.need !== 'up', ru = L.need !== 'down';
+    var netG = new Array(K), valid = new Array(K), info = new Array(K), active = [];
+    var sdnA = new Array(K), supA = new Array(K), slackAnt = new Array(K);
+    for (k = 0; k < K; k++) {
+      valid[k] = antCheck(ants[k]); sdnA[k] = supA[k] = slackAnt[k] = null;
+      info[k] = chainScalars(ants[k], L, antennaTemp(ants[k], L));
+      if (ants[k].enabled && valid[k].ok) { netG[k] = antGainGrid(ants[k], L.satPol); active.push(k); }
+      else netG[k] = null;
+    }
+    var cGain = new Float32Array(N).fill(-80), cSdn = new Float32Array(N).fill(-200), cSup = new Float32Array(N).fill(-200),
+      cSlack = new Float32Array(N).fill(-200), cPout = new Float32Array(N).fill(-60), idx = new Int8Array(N).fill(-1), count = new Uint8Array(N);
+    active.forEach(function (kk) {
+      var g = netG[kk], cs = info[kk], gt = 10 * log10(cs.Tsys), eirpOff = cs.poutDbw - L.dipLoss;
+      var sd = new Float32Array(N), su = new Float32Array(N), sl = new Float32Array(N);
+      for (var e = 0; e < NE; e++) {
+        var bd = B.dn[e] - L.target - gt, bu = B.up[e] - L.target + eirpOff;
+        for (var a = 0; a < NA; a++) {
+          var j = e * NA + a, gg = g[j], s1 = bd + gg, s2 = bu + gg, s = 1e9;
+          if (rd && s1 < s) s = s1;
+          if (ru && s2 < s) s = s2;
+          sd[j] = s1; su[j] = s2; sl[j] = s;
+          if (s > cSlack[j]) { cSlack[j] = s; cSdn[j] = s1; cSup[j] = s2; cGain[j] = gg; cPout[j] = cs.poutDbw; idx[j] = kk; }
+          if (s >= 0) count[j]++;
+        }
+      }
+      sdnA[kk] = sd; supA[kk] = su; slackAnt[kk] = sl;
+    });
+
+    var mi = Math.max(0, Math.min(89, Math.round(L.mask)));
+    var wsum = 0, wdn = 0, wup = 0, wcov = 0, minSdn = 1e9, worst = { slack: 1e9, az: 0, el: mi, idx: -1 };
+    var st = [];
+    for (k = 0; k < K; k++) st.push({ alone: 0, unique: 0, zone: 0, minSdn: 1e9, minSup: 1e9 });
+    for (ie = mi; ie < NE; ie++) {
+      var w = WGT[ie];
+      for (ia = 0; ia < NA; ia++) {
+        i = ie * NA + ia;
+        var sdn = cSdn[i], sup = cSup[i], sl2 = cSlack[i];
+        wsum += w;
+        if (sdn >= 0) wdn += w;
+        if (sup >= 0) wup += w;
+        if (sl2 >= 0) wcov += w;
+        if (sdn < minSdn) minSdn = sdn;
+        if (sl2 < worst.slack) worst = { slack: sl2, az: ia * DAZ, el: ie, idx: idx[i] };
+        var kb = idx[i];
+        if (kb >= 0) {
+          var z = st[kb]; z.zone += w;
+          if (sdn < z.minSdn) z.minSdn = sdn;
+          if (sup < z.minSup) z.minSup = sup;
+        }
+        for (var q = 0; q < active.length; q++) {
+          var ka = active[q];
+          if (slackAnt[ka][i] >= 0) { st[ka].alone += w; if (count[i] === 1) st[ka].unique += w; }
+        }
+      }
+    }
+    var pc = function (x) { return wsum ? 100 * x / wsum : 0; };
+    var maxPaW = 0, paOk = 0, paCount = 0;
+    var antStats = st.map(function (z, kk) {
+      var cs = info[kk], a = ants[kk];
+      var o = {
+        alone: pc(z.alone), unique: pc(z.unique), zone: pc(z.zone), Ta: cs.Ta, Tsys: cs.Tsys,
+        gtBore: a.gain - polLossDb(a.pol, L.satPol) - a.feed - 10 * log10(cs.Tsys),
+        poutDbm: cs.poutDbm, compressed: cs.compressed, reqSatW: null, reqPaW: null, needGain: null, headroom: null, paOk: null
+      };
+      if (z.zone > 0) {
+        o.reqSatW = p10(B.psat - z.minSdn);
+        var needDbw = cs.poutDbw - z.minSup;
+        o.reqPaW = p10(needDbw);
+        o.needGain = needDbw + 30 - L.sdrTx;
+        o.headroom = z.minSup;
+        o.paOk = !ru || z.minSup >= 0;
+        if (valid[kk].ok && a.enabled) { paCount++; if (o.paOk) paOk++; if (ru && o.reqPaW > maxPaW) maxPaW = o.reqPaW; }
+      }
+      return o;
+    });
+    var stats = {
+      cov: pc(wcov), dn: pc(wdn), up: pc(wup), worst: worst, active: active.length,
+      reqSatW: active.length ? p10(B.psat - minSdn) : null, maxPaW: paCount ? maxPaW : null, paOk: paOk, paCount: paCount
+    };
+
+    var prof = { dnMin: [], dnMean: [], dnMax: [], upMin: [], upMean: [], upMax: [], needDn: [], needUp: [], slackMin: [] };
+    for (var e2 = 0; e2 < NE; e2++) {
+      var a1 = 1e9, a2 = -1e9, a3 = 0, b1 = 1e9, b2 = -1e9, b3 = 0, s0 = 1e9;
+      for (var a4 = 0; a4 < NA; a4++) {
+        var j2 = e2 * NA + a4, x = cSdn[j2], y = cSup[j2];
+        if (x < a1) a1 = x; if (x > a2) a2 = x; a3 += x;
+        if (y < b1) b1 = y; if (y > b2) b2 = y; b3 += y;
+        if (cSlack[j2] < s0) s0 = cSlack[j2];
+      }
+      prof.dnMin.push(a1); prof.dnMax.push(a2); prof.dnMean.push(a3 / NA);
+      prof.upMin.push(b1); prof.upMax.push(b2); prof.upMean.push(b3 / NA);
+      prof.needDn.push(satCur[e2] - a1); prof.needUp.push(satCur[e2] - b1); prof.slackMin.push(s0);
+    }
+    return {
+      B: B, satCur: satCur, netG: netG, valid: valid, info: info, idx: idx, count: count,
+      cGain: cGain, cSdn: cSdn, cSup: cSup, cPout: cPout, slackBest: cSlack, slackAnt: slackAnt, sdnA: sdnA, supA: supA,
+      stats: stats, antStats: antStats, prof: prof, mi: mi, _c: {}
+    };
+  }
+
+  /* ---------- Level diagram for one direction ---------- */
+  function chain(S, R, az, el) {
+    var L = S.link, B = R.B, ie = clamp(Math.round(el), 0, 90), ia = Math.round(az / 2) % NA, i = ie * NA + ia;
+    var k = R.idx[i];
+    if (k < 0) return null;
+    var a = S.ants[k], cs = R.info[k], gs = R.satCur[ie];
+    var pol = polLossDb(a.pol, L.satPol), rel = R.netG[k][i] - a.gain + pol + a.feed;
+    var rainMisc = L.rain + L.misc;
+    function build(startLabel, start, steps, totalAt, totalLabel, endLabel) {
+      var rows = [{ label: startLabel, delta: null, level: start, kind: 'start' }], lvl = start;
+      steps.forEach(function (s, n) {
+        if (s === 'TOTAL') { rows.push({ label: totalLabel, delta: null, level: lvl, kind: 'total' }); return; }
+        lvl += s[1];
+        rows.push({ label: s[0], delta: s[1], level: lvl, kind: s[1] >= 0 ? 'gain' : 'loss' });
+      });
+      rows.push({ label: endLabel, delta: null, level: lvl, kind: 'total' });
+      return { rows: rows, end: lvl };
+    }
+    // uplink, levels in dBm
+    var upB = build('Pluto output', L.sdrTx, [
+      ['PA gain', a.paGain], ['PA saturation limit', cs.poutDbm - cs.driveDbm], ['Diplexer', -L.dipLoss], ['Feed and cable', -a.feed],
+      ['Antenna peak gain', a.gain], ['Off boresight', rel], ['Polarisation', -pol], 'TOTAL',
+      ['Free-space loss', -B.fu[ie]], ['Atmosphere', -B.atm[ie]], ['Rain and other', -rainMisc],
+      ['Satellite antenna', gs], ['Satellite pointing', -L.satPointLoss], ['Satellite feed', -L.satLoss]
+    ], 0, 'EIRP', 'Carrier at satellite receiver');
+    var cnUp = upB.end - (KDB + 30 + 10 * log10(B.Tsat));
+    var ebUp = cnUp - B.rUp, mUp = ebUp - B.reqEff;
+    // downlink
+    var dnB = build('Satellite Tx power', 10 * log10(L.satPtxW * 1000), [
+      ['Satellite feed', -L.satLoss], ['Satellite pointing', -L.satPointLoss], ['Satellite antenna', gs], 'TOTAL',
+      ['Free-space loss', -B.fd[ie]], ['Atmosphere', -B.atm[ie]], ['Rain and other', -rainMisc], ['Polarisation', -pol],
+      ['Antenna peak gain', a.gain], ['Off boresight', rel], ['Feed and cable', -a.feed]
+    ], 0, 'EIRP', 'Carrier at antenna port');
+    var n0Dn = KDB + 30 + 10 * log10(cs.Tsys);
+    var cnDn = dnB.end - n0Dn, ebDn = cnDn - B.rDn, mDn = ebDn - B.reqEff;
+    function f1(v) { return v.toFixed(1); }
+    return {
+      k: k, az: az, el: el,
+      up: {
+        rows: upB.rows, margin: mUp - L.target,
+        info: [
+          ['Satellite noise temperature', f1(B.Tsat) + ' K'], ['C/N0', f1(cnUp) + ' dB-Hz'], ['Eb/N0', f1(ebUp) + ' dB'],
+          ['Required Eb/N0 with losses', f1(B.reqEff) + ' dB'], ['Required margin', f1(L.target) + ' dB'], ['Slack', (mUp - L.target >= 0 ? '+' : '') + f1(mUp - L.target) + ' dB', mUp - L.target >= 0 ? 'pass' : 'fail']
+        ]
+      },
+      dn: {
+        rows: dnB.rows, margin: mDn - L.target,
+        info: [
+          ['Antenna temperature', f1(cs.Ta) + ' K'], ['System temperature', f1(cs.Tsys) + ' K'],
+          ['G/T', f1(R.netG[k][i] - 10 * log10(cs.Tsys)) + ' dB/K'], ['C/N0', f1(cnDn) + ' dB-Hz'], ['Eb/N0', f1(ebDn) + ' dB'],
+          ['Required Eb/N0 with losses', f1(B.reqEff) + ' dB'], ['Required margin', f1(L.target) + ' dB'], ['Slack', (mDn - L.target >= 0 ? '+' : '') + f1(mDn - L.target) + ' dB', mDn - L.target >= 0 ? 'pass' : 'fail']
+        ]
+      }
+    };
+  }
+
+
+  /* ---------- Pass model: a circular orbit passing the station on a great circle ---------- */
+  var MU = 398600.4418, CKM = 299792.458;
+  function passGeom(L) {
+    var r = RE + L.altKm, e0 = clamp(L.passEl, 0, 90) * D2R;
+    var lam0 = Math.max(0, Math.acos(clamp(RE * Math.cos(e0) / r, -1, 1)) - e0);
+    var om = Math.sqrt(MU / (r * r * r)), lamH = Math.acos(RE / r);
+    var lamM = Math.acos(clamp(RE * Math.cos(L.mask * D2R) / r, -1, 1)) - L.mask * D2R;
+    var sh = Math.acos(clamp(Math.cos(lamH) / Math.cos(lam0), -1, 1));
+    var sm = lamM > lam0 ? Math.acos(clamp(Math.cos(lamM) / Math.cos(lam0), -1, 1)) : 0;
+    return { r: r, om: om, v: om * r, lam0: lam0, lamH: lamH, sh: sh, sm: sm, period: 2 * Math.PI / om };
+  }
+  function passAt(L, g, s) {
+    var cl = Math.cos(g.lam0) * Math.cos(s), lam = Math.acos(clamp(cl, -1, 1));
+    var x = Math.sin(g.lam0) * Math.cos(s), y = Math.sin(s);
+    var az = ((L.az0 + Math.atan2(y, x) * R2D) % 360 + 360) % 360;
+    var rho = Math.sqrt(RE * RE + g.r * g.r - 2 * RE * g.r * cl);
+    var el = Math.atan2(cl - RE / g.r, Math.sin(lam)) * R2D;
+    var rr = RE * g.v * Math.cos(g.lam0) * Math.sin(s) / rho;   // range rate, km/s, positive when receding
+    return { s: s, t: s / g.om, lam: lam, az: az, el: el, rho: rho, rr: rr,
+      dDn: -L.fDn * 1e6 * rr / CKM, dUp: -L.fUp * 1e6 * rr / CKM };
+  }
+  function passSample(S, R, g, s) {
+    var L = S.link, p = passAt(L, g, s), h = 1e-3;
+    var a = passAt(L, g, s - h), b = passAt(L, g, s + h);
+    p.rate = (b.dDn - a.dDn) / (2 * h / g.om);       // Hz per second, downlink
+    var ie = clamp(Math.round(p.el), 0, 90), i = ie * NA + (Math.round(p.az / DAZ) % NA);
+    p.ie = ie; p.i = i; p.k = R.idx[i]; p.sdn = R.cSdn[i]; p.sup = R.cSup[i]; p.slack = R.slackBest[i]; p.gain = R.cGain[i];
+    p.aboveMask = p.el >= L.mask - 1e-9;
+    p.ok = p.aboveMask && p.k >= 0 && p.slack >= 0;
+    p.state = !p.aboveMask ? 1 : p.k < 0 ? 2 : p.slack < 0 ? 3 : 4;    // 1 below mask, 2 no antenna, 3 short of margin, 4 closed
+    return p;
+  }
+  function passModel(S, R) {
+    var L = S.link, g = passGeom(L), N = 241, smp = [], i;
+    for (i = 0; i < N; i++) smp.push(passSample(S, R, g, -g.sh + 2 * g.sh * i / (N - 1)));
+    var dt = 2 * g.sh / g.om / (N - 1), closed = 0, gaps = 0, hand = 0, prevOk = false, prevK = -1, maxDop = 0, maxRate = 0, maxEl = 0, above = 0, inGap = false;
+    smp.forEach(function (p) {
+      if (p.aboveMask) above++;
+      if (p.ok) { closed++; if (prevK >= 0 && p.k !== prevK) hand++; prevK = p.k; }
+      if (p.aboveMask) { if (!p.ok && !inGap) { gaps++; inGap = true; } if (p.ok) inGap = false; }
+      if (Math.abs(p.dDn) > maxDop && p.aboveMask) maxDop = Math.abs(p.dDn);
+      if (Math.abs(p.rate) > maxRate && p.aboveMask) maxRate = Math.abs(p.rate);
+      if (p.el > maxEl) maxEl = p.el;
+    });
+    var tAbove = g.sm > 0 ? 2 * g.sm / g.om : 0, tClosed = closed * dt;
+    return {
+      g: g, smp: smp, dt: dt, exists: g.sm > 0,
+      stats: { maxEl: maxEl, tHorizon: 2 * g.sh / g.om, tAbove: tAbove, tClosed: tClosed, fracClosed: tAbove > 0 ? Math.min(1, tClosed / tAbove) : 0,
+        gaps: gaps, handovers: hand, maxDop: maxDop, maxRate: maxRate,
+        kbDn: tClosed * L.rateDn / 8, kbUp: tClosed * L.rateUp / 8, speed: g.v, period: g.period }
+    };
+  }
+
+  /* ---------- Validation ---------- */
+  function beamText(a) { return isAxis(kindOf(a)) ? 'this dipole pattern' : 'a ' + a.bwH + '° by ' + a.bwV + '° beam'; }
+  function validate(S, R) {
+    var out = [], L = S.link, t = SATS[L.satType] || SATS.custom;
+    S.ants.forEach(function (a, k) {
+      var v = R.valid[k];
+      if (!v.ok) out.push({ level: 'error', ant: a.id, msg: a.name + ': ' + (v.delta > 0 ? 'a peak gain of ' + a.gain.toFixed(1) + ' dBi is not possible with ' : 'a peak gain of ' + a.gain.toFixed(1) + ' dBi is far below what is possible with ') + beamText(a) + ' (about ' + v.dEst.toFixed(1) + ' dBi directivity). Excluded from the results until fixed.' });
+      if (R.info[k].compressed && a.enabled) out.push({ level: 'warn', msg: a.name + ': the Pluto plus PA gain drives ' + (R.info[k].driveDbm).toFixed(1) + ' dBm into a ' + R.info[k].maxDbm.toFixed(1) + ' dBm PA. Back off the drive or the PA will compress.' });
+    });
+    if (L.passEl <= L.mask) out.push({ level: 'error', msg: 'The pass peaks at ' + L.passEl + '°, at or below the ' + L.mask + '° minimum elevation, so the satellite is never usable. Raise the pass peak or lower the minimum elevation.' });
+    var sc = satCheck(L);
+    if (!sc.ok) out.push({ level: 'error', msg: 'Satellite antenna: ' + L.satGain.toFixed(1) + ' dBi is ' + (sc.delta > 0 ? 'not possible with' : 'far below what is possible with') + ' a ' + L.satBw + '° beam (about ' + sc.dEst.toFixed(1) + ' dBi directivity). The model is using ' + (sc.delta > 0 ? 'the physical limit instead.' : 'your value as entered.') });
+    if (L.satAtt === 'tumble' && t.nadirOnly) out.push({ level: 'warn', msg: t.label + ' assumes a satellite that keeps pointing at Earth. While tumbling it gives only ' + R.satCur[90].toFixed(1) + ' dBi at the ' + L.tumbleP + '% level.' });
+    if (!R.stats.active) out.push({ level: 'error', msg: 'No active antennas. Add one or enable an existing antenna.' });
+    var bwDn = occBw(L, L.rateDn), bwUp = occBw(L, L.rateUp);
+    if (Math.max(bwDn, bwUp) > 5e6) out.push({ level: 'error', msg: 'Occupied bandwidth of ' + (Math.max(bwDn, bwUp) / 1e6).toFixed(1) + ' MHz is wider than a practical S-band channel (5 MHz). Lower the data rate or use a denser modulation.' });
+    if (L.fDn < 2200 || L.fDn > 2290) out.push({ level: 'warn', msg: 'Downlink ' + L.fDn + ' MHz is outside the 2200-2290 MHz space-to-Earth allocation.' });
+    if (L.fUp < 2025 || L.fUp > 2110) out.push({ level: 'warn', msg: 'Uplink ' + L.fUp + ' MHz is outside the 2025-2110 MHz Earth-to-space allocation.' });
+    if (Math.abs(L.fDn - L.fUp) < 20) out.push({ level: 'warn', msg: 'Uplink and downlink frequencies are within 20 MHz of each other. Expect desensitisation without strong filtering.' });
+    var maxOut = -1e9;
+    S.ants.forEach(function (a, k) { if (a.enabled && R.valid[k].ok && R.info[k].poutDbm > maxOut) maxOut = R.info[k].poutDbm; });
+    if (maxOut > 20) out.push({ level: 'info', msg: 'The strongest PA output is ' + maxOut.toFixed(0) + ' dBm. With about 45 dB of diplexer isolation the LNA input still sees about ' + (maxOut - 45).toFixed(0) + ' dBm of your own transmitter. Check the diplexer isolation and the LNA compression point.' });
+    var linGround = S.ants.some(function (a) { return a.enabled && a.pol === 'LIN'; });
+    if (L.satAtt === 'tumble' && L.satPol === 'LIN' && linGround) out.push({ level: 'warn', msg: 'Linear to linear with a tumbling satellite: the flat 3 dB used here is only an average. Planned at the ' + L.tumbleP + '% level, a random polarisation mismatch would cost about ' + (-20 * log10(Math.cos(L.tumbleP / 100 * Math.PI / 2))).toFixed(0) + ' dB. Use a circularly polarised antenna on one end.' });
+    if (L.satPtxW > 10) out.push({ level: 'warn', msg: 'Satellite Tx power above 10 W is high for a small S-band payload.' });
+    var dup = {};
+    S.ants.forEach(function (a) {
+      var key = Math.round(a.az) + '/' + Math.round(a.el);
+      if (a.el < 89 && dup[key]) out.push({ level: 'info', msg: a.name + ' points the same way as ' + dup[key] + '.' });
+      else if (a.el < 89) dup[key] = a.name;
+    });
+    return out;
+  }
+
+  return {
+    NA: NA, NE: NE, N: N, RE: RE, DAZ: DAZ, D2R: D2R, R2D: R2D, WGT: WGT, DX: DX, DY: DY, DZ: DZ, KDB: KDB,
+    MODS: MODS, CODES: CODES, POLS: POLS, PRESETS: PRESETS, SATS: SATS, LIMITS: LIMITS, ALIM: ALIM, PALETTE: PALETTE, MAX_ANTS: MAX_ANTS,
+    defaultLink: defaultLink, defaultState: defaultState, mkAnt: mkAnt, kindOf: kindOf, isAxis: isAxis, modelDirectivity: modelDirectivity, antCheck: antCheck, satCheck: satCheck,
+    frame: frame, cutCurve: cutCurve, beamOutline: beamOutline, polLossDb: polLossDb,
+    slantKm: slantKm, fsplDb: fsplDb, airmass: airmass, etaOfElev: etaOfElev, passGeom: passGeom, passAt: passAt, passModel: passModel, passSample: passSample, MU: MU, reqEbN0: reqEbN0, occBw: occBw,
+    satGainAt: satGainAt, satCurve: satCurve, satOptionCurves: satOptionCurves, satTsys: satTsys, tumbleGain: tumbleGain,
+    antennaTemp: antennaTemp, chainScalars: chainScalars, linkBases: linkBases, contour: contour, compute: compute, chain: chain, validate: validate
+  };
+})();
+if (typeof module !== 'undefined') module.exports = Engine;
+</script>
+<script>
+(function () {
+  'use strict';
+  var E = Engine, NA = E.NA, NE = E.NE, R2D = E.R2D, D2R = E.D2R;
+  function $(id) { return document.getElementById(id); }
+  function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function fmtNum(v, dec) {
+    if (dec == null) dec = Math.abs(v) >= 100 ? 0 : Math.abs(v) >= 10 ? 1 : 2;
+    var s = v.toFixed(dec);
+    return s.indexOf('.') >= 0 ? s.replace(/\.?0+$/, '') : s;
+  }
+  function fmtW(w) {
+    if (w == null || !isFinite(w)) return 'n/a';
+    if (w >= 10000) return '>10 kW';
+    if (w >= 100) return w.toFixed(0) + ' W';
+    if (w >= 10) return w.toFixed(1) + ' W';
+    if (w >= 1) return w.toFixed(2) + ' W';
+    return (w * 1000).toFixed(0) + ' mW';
+  }
+  function p10(x) { return Math.pow(10, x / 10); }
+  function sgn(v) { return (v >= 0 ? '+' : '') + v.toFixed(1); }
+
+  /* ---------- State ---------- */
+  /* v2: the defaults and the antenna checks changed, so setups saved by v1 (which were only ever the old default) start fresh. Exported files still load. */
+  var KEY = 'rf-link-v2';
+  /* Turns untrusted JSON (localStorage or an imported file) into a safe state, or null if it is not a setup.
+     adj counts values that had to be clamped, replaced or dropped. */
+  function sanitizeState(j) {
+    if (!j || typeof j !== 'object' || !j.link || typeof j.link !== 'object' || !Array.isArray(j.ants)) return null;
+    var adj = 0, L = E.defaultLink(), k;
+    for (k in L) {
+      if (!(k in j.link)) continue;
+      var lim = E.LIMITS[k], v = j.link[k];
+      if (lim) {
+        if (typeof v === 'number' && isFinite(v)) { L[k] = clamp(v, lim.min, lim.max); if (L[k] !== v) adj++; } else adj++;
+      } else if (typeof v === 'string') L[k] = v; else adj++;
+    }
+    if (!E.MODS[L.mod]) { L.mod = 'bpsk'; adj++; }
+    if (!E.CODES[L.coding]) { L.coding = 'rsconv'; adj++; }
+    if (!E.POLS[L.satPol]) { L.satPol = 'RHCP'; adj++; }
+    if (!E.SATS[L.satType]) { L.satType = 'dual'; adj++; }
+    if (['tumble', 'nadir'].indexOf(L.satAtt) < 0) { L.satAtt = 'tumble'; adj++; }
+    if (['both', 'down', 'up'].indexOf(L.need) < 0) { L.need = 'both'; adj++; }
+    var ants = [], maxId = 0, used = {};
+    if (j.ants.length > E.MAX_ANTS) adj += j.ants.length - E.MAX_ANTS;
+    j.ants.slice(0, E.MAX_ANTS).forEach(function (a) {
+      if (!a || !E.PRESETS[a.type]) { adj++; return; }
+      var b = E.mkAnt(a.type, { nextId: 0 });
+      for (var key in E.ALIM) if (typeof a[key] === 'number' && isFinite(a[key])) { b[key] = clamp(a[key], E.ALIM[key].min, E.ALIM[key].max); if (b[key] !== a[key]) adj++; }
+      if (typeof a.name === 'string') b.name = a.name.slice(0, 28);
+      if (typeof a.color === 'string' && /^#[0-9a-f]{6}$/i.test(a.color)) b.color = a.color;
+      if (E.POLS[a.pol]) b.pol = a.pol;
+      b.enabled = a.enabled !== false; b.outline = a.outline !== false;
+      b.id = (typeof a.id === 'number' && isFinite(a.id) && a.id >= 1 && Math.floor(a.id) === a.id && !used[a.id]) ? a.id : 0;
+      if (b.id) { used[b.id] = 1; maxId = Math.max(maxId, b.id); }
+      ants.push(b);
+    });
+    ants.forEach(function (b) { if (!b.id) { b.id = ++maxId; used[b.id] = 1; } });
+    return { link: L, ants: ants, nextId: maxId + 1, adj: adj };
+  }
+  function loadState() {
+    var S = E.defaultState();
+    try {
+      var raw = localStorage.getItem(KEY);
+      if (!raw) return S;
+      var st = sanitizeState(JSON.parse(raw));
+      if (st) { S.link = st.link; S.ants = st.ants; S.nextId = st.nextId; }
+    } catch (e) { return E.defaultState(); }
+    return S;
+  }
+  var S = loadState(), R = null;
+  var selId = S.ants.length ? S.ants[0].id : null;
+  var V = { tab: 'sky', layer: 'gain', solo: null, outlines: true, beams: true, bores: true, hatch: true, models: true, dir: null, mainTab: 'cov', ps: 0, play: false, cam: { yaw: -28, pitch: 38 }, hit: [] };
+  var saveTimer = 0;
+  function save() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function () { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { } }, 300);
+  }
+  var pending = false;
+  function changed() {
+    if (pending) return;
+    pending = true;
+    requestAnimationFrame(function () { pending = false; update(); });
+  }
+  function curAnt() { for (var i = 0; i < S.ants.length; i++) if (S.ants[i].id === selId) return S.ants[i]; return null; }
+  function antIndex(id) { for (var i = 0; i < S.ants.length; i++) if (S.ants[i].id === id) return i; return -1; }
+
+  /* ---------- Field builders ---------- */
+  var uid = 0;
+  function mkField(cfg, reg) {
+    var id = 'f' + (++uid), w = document.createElement('div');
+    w.className = 'fld';
+    w.innerHTML = '<label for="' + id + '">' + cfg.label + '</label><div class="inp"><input id="' + id + '" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"><span class="unit">' + cfg.unit + '</span></div>' +
+      (cfg.slider ? '<input class="rng" type="range" aria-label="' + cfg.label + ' slider">' : '') +
+      (cfg.hint ? '<div class="hint">' + cfg.hint + '</div>' : '') + '<div class="err" role="alert" hidden></div>';
+    var inp = w.querySelector('input[type=text]'), rng = w.querySelector('.rng'), err = w.querySelector('.err'), timer;
+    function show(m) { err.textContent = m; err.hidden = !m; }
+    function toS(v) { return cfg.log ? Math.log(v / cfg.min) / Math.log(cfg.max / cfg.min) * 1000 : v; }
+    function fromS(t) { return cfg.log ? cfg.min * Math.pow(cfg.max / cfg.min, t / 1000) : t; }
+    if (rng) { rng.min = cfg.log ? 0 : cfg.min; rng.max = cfg.log ? 1000 : cfg.max; rng.step = cfg.log ? 1 : (cfg.step || 'any'); }
+    function sync() { var v = cfg.get(); inp.value = fmtNum(v, cfg.dec); inp.classList.remove('bad'); if (rng) rng.value = toS(v); }
+    inp.addEventListener('input', function () {
+      var s = inp.value.trim().replace(',', '.'), v = parseFloat(s);
+      if (s === '' || !isFinite(v) || !/^-?\d*\.?\d*$/.test(s)) { inp.classList.add('bad'); show('Enter a number.'); return; }
+      if (v < cfg.min || v > cfg.max) { inp.classList.add('bad'); show('Allowed range: ' + fmtNum(cfg.min) + ' to ' + fmtNum(cfg.max) + ' ' + cfg.unit + '.'); return; }
+      inp.classList.remove('bad'); show(''); cfg.set(v); if (rng) rng.value = toS(v);
+    });
+    inp.addEventListener('blur', function () {
+      if (!inp.classList.contains('bad')) return;
+      var cur = cfg.get();
+      inp.value = fmtNum(cur, cfg.dec); inp.classList.remove('bad');
+      show('Reverted to ' + fmtNum(cur, cfg.dec) + ' ' + cfg.unit + '. Allowed range: ' + fmtNum(cfg.min) + ' to ' + fmtNum(cfg.max) + '.');
+      clearTimeout(timer); timer = setTimeout(function () { show(''); }, 3500);
+    });
+    if (rng) rng.addEventListener('input', function () {
+      var v = fromS(parseFloat(rng.value));
+      if (cfg.step && !cfg.log) v = Math.round(v / cfg.step) * cfg.step;
+      v = clamp(cfg.log ? parseFloat(v.toPrecision(3)) : v, cfg.min, cfg.max);
+      cfg.set(v); inp.value = fmtNum(v, cfg.dec); inp.classList.remove('bad'); show('');
+    });
+    sync();
+    if (reg) reg.push(sync);
+    return w;
+  }
+  function mkSelect(cfg, reg) {
+    var id = 'f' + (++uid), w = document.createElement('div');
+    w.className = 'fld';
+    w.innerHTML = '<label for="' + id + '">' + cfg.label + '</label><select id="' + id + '"></select>' + (cfg.hint ? '<div class="hint">' + cfg.hint + '</div>' : '');
+    var sel = w.querySelector('select');
+    cfg.options.forEach(function (o) { var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; sel.appendChild(op); });
+    function sync() { sel.value = cfg.get(); }
+    sel.addEventListener('change', function () { cfg.set(sel.value); });
+    sync();
+    if (reg) reg.push(sync);
+    return w;
+  }
+  function group(title, open, nodes) {
+    var d = document.createElement('details'); d.className = 'grp'; if (open) d.open = true;
+    var s = document.createElement('summary'); s.textContent = title; d.appendChild(s);
+    var g = document.createElement('div'); g.className = 'gb';
+    nodes.forEach(function (n) { g.appendChild(n); });
+    d.appendChild(g);
+    return d;
+  }
+
+  /* ---------- Left panel ---------- */
+  var linkReg = [];
+  function lf(key, extra) {
+    var lim = E.LIMITS[key];
+    return mkField(Object.assign({
+      label: lim.label, unit: lim.unit, min: lim.min, max: lim.max, step: lim.step, log: lim.log, hint: lim.hint,
+      get: function () { return S.link[key]; }, set: function (v) { S.link[key] = v; changed(); }
+    }, extra || {}), linkReg);
+  }
+  function ls(key, label, opts, hint) {
+    return mkSelect({
+      label: label, options: opts, hint: hint,
+      get: function () { return S.link[key]; }, set: function (v) { S.link[key] = v; changed(); }
+    }, linkReg);
+  }
+  function objOpts(o) { return Object.keys(o).map(function (k) { return [k, typeof o[k] === 'string' ? o[k] : o[k].label]; }); }
+  function buildLeft() {
+    var host = $('linkGroups'); host.innerHTML = ''; linkReg = [];
+    var alt = lf('altKm', { slider: true, dec: 0 });
+    var quick = document.createElement('div'); quick.className = 'quick';
+    [300, 500, 550, 800, 1200].forEach(function (v) {
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'btn sm'; b.textContent = v + ' km';
+      b.addEventListener('click', function () { S.link.altKm = v; linkReg.forEach(function (f) { f(); }); changed(); });
+      quick.appendChild(b);
+    });
+    alt.appendChild(quick);
+    host.appendChild(group('Orbit and sky', true, [alt, lf('mask', { slider: true, dec: 0, hint: 'Aim for 20 degrees or more. Below that the range and the ground noise both climb quickly.' })]));
+    host.appendChild(group('Signal', true, [
+      lf('fDn', { dec: 1 }), lf('fUp', { dec: 1 }),
+      lf('rateDn', { slider: true }), lf('rateUp', { slider: true }),
+      ls('mod', 'Modulation', objOpts(E.MODS)), ls('coding', 'Error coding', objOpts(E.CODES)),
+      lf('implLoss'), lf('target', { hint: 'Spare dB a direction needs before it counts as covered.' }),
+      ls('need', 'Links that must close', [['both', 'Uplink and downlink'], ['down', 'Downlink only'], ['up', 'Uplink only']])
+    ]));
+    var typeF = ls('satType', 'Satellite antenna', objOpts(E.SATS));
+    var sel = typeF.querySelector('select');
+    sel.addEventListener('change', function () {
+      var t = E.SATS[S.link.satType]; S.link.satGain = t.gain; S.link.satPol = t.pol; if (t.bw) S.link.satBw = t.bw;
+      linkReg.forEach(function (f) { f(); }); satBlurb(); changed();
+    });
+    var bl = document.createElement('div'); bl.className = 'blurb'; bl.id = 'satBlurb';
+    var attF = ls('satAtt', 'Attitude', [['tumble', 'Tumbling, no pointing'], ['nadir', 'Stabilised, nadir-pointed']], 'A tumbling satellite is planned at the orientation percentile below.');
+    attF.querySelector('select').addEventListener('change', satBlurb);
+    host.appendChild(group('Satellite', true, [
+      typeF, bl, attF, lf('tumbleP', { dec: 0 }),
+      lf('satGain'), lf('satBw', { dec: 0 }), lf('satPtxW', { slider: true }),
+      lf('satLoss'), lf('satPointLoss'), lf('satNF'), lf('satTa', { dec: 0 }),
+      ls('satPol', 'Satellite polarisation', objOpts(E.POLS))
+    ]));
+    host.appendChild(group('Ground chain (same for every antenna)', false, [
+      lf('sdrTx', { hint: 'Each antenna has its own Pluto. Set its PA in the antenna editor.' }), lf('sdrNF'), lf('lnaNF'), lf('lnaGain'), lf('dipLoss')
+    ]));
+    host.appendChild(group('Propagation', false, [lf('atmZenith', { dec: 2 }), lf('rain'), lf('misc')]));
+    satBlurb();
+  }
+  function satBlurb() {
+    var b = $('satBlurb'); if (!b) return;
+    var t = E.SATS[S.link.satType];
+    b.textContent = t.blurb + (S.link.satAtt === 'tumble' && t.nadirOnly ? ' Not suitable while tumbling.' : '');
+  }
+  function renderDerived() {
+    var L = S.link, B = R.B, m = R.mi;
+    function bw(hz) { return hz >= 1e6 ? (hz / 1e6).toFixed(2) + ' MHz' : (hz / 1e3).toFixed(0) + ' kHz'; }
+    var rows = [
+      ['Required Eb/N0 with loss', B.reqEff.toFixed(1) + ' dB'],
+      ['Bandwidth down / up', bw(E.occBw(L, L.rateDn)) + ' / ' + bw(E.occBw(L, L.rateUp))],
+      ['Range at mask / zenith', Math.round(B.slant[m]) + ' / ' + Math.round(B.slant[90]) + ' km'],
+      ['Free-space loss at mask', B.fd[m].toFixed(1) + ' / ' + B.fu[m].toFixed(1) + ' dB'],
+      ['Atmosphere at mask', B.atm[m].toFixed(2) + ' dB']
+    ];
+    $('derived').innerHTML = rows.map(function (r) { return '<dt>' + r[0] + '</dt><dd>' + r[1] + '</dd>'; }).join('');
+  }
+
+  /* ---------- Antenna list and editor ---------- */
+  function renderList() {
+    var h = '';
+    S.ants.forEach(function (a, k) {
+      var v = R.valid[k], st = R.antStats[k], on = a.enabled && v.ok;
+      h += '<div class="acard' + (a.id === selId ? ' sel' : '') + (on ? '' : ' off') + '" data-id="' + a.id + '"><div class="ahead"><span class="sw" style="background:' + a.color + ';color:' + contrastInk(a.color) + '">' + (k + 1) + '</span><b>' + esc(a.name) + '</b><span class="btns">' +
+        '<button type="button" class="btn sm' + (a.outline ? ' on' : '') + '" data-act="outline" title="Show this antenna\'s coverage outline">Outline</button>' +
+        '<button type="button" class="btn sm' + (V.solo === a.id ? ' on' : '') + '" data-act="solo" title="View only this antenna">Solo</button>' +
+        '<button type="button" class="btn sm' + (a.enabled ? ' on' : '') + '" data-act="power" title="Include this antenna in the array">' + (a.enabled ? 'On' : 'Off') + '</button></span></div>' +
+        '<div class="ameta">' + esc(E.PRESETS[a.type].label) + ' · az ' + fmtNum(a.az, 0) + '° el ' + fmtNum(a.el, 0) + '° · ' + a.gain.toFixed(1) + ' dBi · ' + E.POLS[a.pol] + '</div>';
+      if (!v.ok) h += '<div class="astat"><span class="bad">Excluded: gain and beamwidths disagree.</span></div>';
+      else if (!a.enabled) h += '<div class="astat">Switched off.</div>';
+      else {
+        var sel = a.id === selId;
+        h += '<div class="bar"><i style="width:' + Math.min(100, st.alone).toFixed(1) + '%;background:' + a.color + '"></i></div><div class="astat">Closes ' + st.alone.toFixed(0) + '% of the sky alone · serves ' + st.zone.toFixed(0) + '%';
+        if (st.zone > 0) {
+          h += ' · <span class="' + (st.paOk ? 'okc' : 'bad') + '">PA ' + fmtW(st.reqPaW) + (st.paOk ? ' ok' : ' short') + '</span>';
+          if (sel) h += '<br>G/T ' + sgn(st.gtBore) + ' dB/K at boresight. Its worst direction needs ' + fmtW(st.reqSatW) + ' from the satellite and ' + fmtW(st.reqPaW) + ' from its PA (it has ' + fmtW(a.paMax) + ').';
+        } else h += ' · another antenna is always stronger';
+        h += '</div>';
+      }
+      h += '</div>';
+    });
+    if (!S.ants.length) h = '<p class="sub" style="margin:0">No antennas yet. Add one above.</p>';
+    $('alist').innerHTML = h;
+    $('antCount').textContent = S.ants.length + ' of ' + E.MAX_ANTS;
+  }
+  var edReg = [];
+  function af(a, key, extra) {
+    var lim = E.ALIM[key];
+    return mkField(Object.assign({
+      label: lim.label, unit: lim.unit, min: lim.min, max: lim.max, dec: 1,
+      get: function () { return a[key]; }, set: function (v) { a[key] = v; changed(); }
+    }, extra || {}), edReg);
+  }
+  function buildEditor() {
+    var host = $('editor'), a = curAnt();
+    host.innerHTML = ''; edReg = [];
+    if (!a) { host.innerHTML = '<p class="sub" style="margin:0">Select or add an antenna to edit it.</p>'; return; }
+    var nameW = document.createElement('div'); nameW.className = 'fld';
+    nameW.innerHTML = '<label for="edName">Name</label><input id="edName" class="txt" type="text" maxlength="28">';
+    var nm = nameW.querySelector('input'); nm.value = a.name;
+    nm.addEventListener('input', function () { a.name = nm.value.slice(0, 28) || 'Antenna'; changed(); });
+    host.appendChild(nameW);
+    host.appendChild(mkSelect({
+      label: 'Type', options: Object.keys(E.PRESETS).map(function (k) { return [k, E.PRESETS[k].label]; }),
+      get: function () { return a.type; },
+      set: function (t) {
+        var old = E.PRESETS[a.type], p = E.PRESETS[t];
+        if (a.name === old.label + ' ' + a.id) a.name = p.label + ' ' + a.id;
+        a.type = t; a.gain = p.gain; a.bwH = p.bwH; a.bwV = p.bwV; a.floor = p.floor; a.pol = p.pol;
+        buildEditor(); changed();
+      }
+    }, edReg));
+    var bl = document.createElement('div'); bl.className = 'blurb'; bl.textContent = E.PRESETS[a.type].blurb; host.appendChild(bl);
+    var axis = E.isAxis(E.kindOf(a));
+    function two(x, y) { var d = document.createElement('div'); d.className = 'two'; d.appendChild(x); d.appendChild(y); host.appendChild(d); }
+    two(af(a, 'az'), af(a, 'el'));
+    two(af(a, 'roll'), af(a, 'feed'));
+    two(af(a, 'gain'), af(a, 'floor'));
+    var bh = af(a, 'bwH'), bv = af(a, 'bwV');
+    if (axis) { [bh, bv].forEach(function (w) { w.classList.add('dis'); w.querySelector('input').disabled = true; }); }
+    two(bh, bv);
+    if (axis) { var n = document.createElement('div'); n.className = 'blurb'; n.textContent = 'Beamwidths are fixed by the dipole pattern (78° in the E plane, all-round in the H plane). Gain is limited to what that pattern can radiate.'; host.appendChild(n); }
+    host.appendChild(mkSelect({
+      label: 'Polarisation', options: objOpts(E.POLS), get: function () { return a.pol; },
+      set: function (v) { a.pol = v; changed(); }
+    }, edReg));
+    var pah = document.createElement('div'); pah.className = 'sub'; pah.style.margin = '10px 0 4px'; pah.textContent = 'Transmit chain: this antenna has its own Pluto and PA';
+    host.appendChild(pah); two(af(a, 'paGain'), af(a, 'paMax'));
+    var pn = document.createElement('div'); pn.className = 'blurb'; pn.id = 'edPA'; host.appendChild(pn);
+    var note = document.createElement('div'); note.className = 'note'; note.id = 'edNote'; note.hidden = true; host.appendChild(note);
+    var row = document.createElement('div'); row.className = 'row';
+    row.innerHTML = '<button type="button" class="btn" id="edFix" hidden>Set gain to match beamwidths</button><button type="button" class="btn" id="edDup">Duplicate</button><button type="button" class="btn danger" id="edDel">Delete</button>';
+    host.appendChild(row);
+    var cw = document.createElement('div');
+    cw.innerHTML = '<div class="sub" style="margin-bottom:4px">Pattern cuts, relative to peak. Solid: H plane. Dashed: V plane.</div><div class="cutWrap"><canvas id="cut"></canvas></div><div class="sub" id="cutNote" style="text-align:center;margin-top:4px"></div>';
+    host.appendChild(cw);
+    $('edFix').addEventListener('click', function () {
+      var c = E.antCheck(a); if (c.dEst == null) return;
+      a.gain = clamp(Math.round((c.dEst - 1) * 10) / 10, E.ALIM.gain.min, E.ALIM.gain.max);
+      edReg.forEach(function (f) { f(); }); changed();
+    });
+    $('edDup').addEventListener('click', function () {
+      if (S.ants.length >= E.MAX_ANTS) { antMsg('Limit reached: an array holds at most ' + E.MAX_ANTS + ' antennas.'); return; }
+      var b = Object.assign({}, a); b.id = S.nextId++; b.name = (a.name + ' copy').slice(0, 28); b.color = E.PALETTE[b.id % E.PALETTE.length]; b.az = (a.az + 20) % 360;
+      S.ants.splice(antIndex(a.id) + 1, 0, b); selId = b.id; buildEditor(); changed();
+    });
+    $('edDel').addEventListener('click', function () {
+      var i = antIndex(a.id); S.ants.splice(i, 1);
+      if (V.solo === a.id) V.solo = null;
+      selId = S.ants.length ? S.ants[Math.min(i, S.ants.length - 1)].id : null;
+      buildEditor(); changed();
+    });
+  }
+  function renderEditorNote() {
+    var a = curAnt(), note = $('edNote'), fix = $('edFix');
+    if (!a || !note) return;
+    var k = antIndex(a.id), v = R.valid[k];
+    if (!v.ok) {
+      note.hidden = false; fix.hidden = false;
+      note.textContent = (E.isAxis(E.kindOf(a)) ? 'This dipole pattern' : 'A ' + a.bwH + '° by ' + a.bwV + '° beam') + ' has about ' + v.dEst.toFixed(1) + ' dBi directivity, so ' + a.gain.toFixed(1) + ' dBi is ' + (v.delta > 0 ? 'not possible' : 'far too low to be realistic') + '. This antenna is excluded from all results until the values agree.';
+    } else { note.hidden = true; fix.hidden = true; }
+    var ip = R.info[k], as = R.antStats[k], pa = $('edPA');
+    if (pa) pa.textContent = 'Pluto ' + S.link.sdrTx.toFixed(1) + ' dBm + PA ' + a.paGain.toFixed(0) + ' dB = ' + ip.driveDbm.toFixed(1) + ' dBm drive. Output ' + fmtW(Math.pow(10, ip.poutDbw / 10)) + (ip.compressed ? ' (PA limit reached, output is capped)' : '') + '. System noise ' + ip.Tsys.toFixed(0) + ' K, boresight G/T ' + sgn(as.gtBore) + ' dB/K.' + (as.reqPaW != null ? ' To close its worst direction it needs ' + fmtW(as.reqPaW) + ' at the PA output, so a PA gain of about ' + as.needGain.toFixed(0) + ' dB from the Pluto.' : '');
+    var cn = $('cutNote'); if (cn) cn.textContent = '0 dB is the ' + a.gain.toFixed(1) + ' dBi peak';
+  }
+  var msgTimer;
+  function antMsg(t) {
+    var m = $('antMsg'); m.textContent = t; m.hidden = !t;
+    clearTimeout(msgTimer); if (t) msgTimer = setTimeout(function () { m.hidden = true; }, 4000);
+  }
+  function armConfirm(btn, label, action) {
+    var t;
+    btn.addEventListener('click', function () {
+      if (btn.dataset.armed) { btn.dataset.armed = ''; btn.textContent = label; clearTimeout(t); action(); return; }
+      btn.dataset.armed = '1'; btn.textContent = 'Click again to confirm';
+      t = setTimeout(function () { btn.dataset.armed = ''; btn.textContent = label; }, 3000);
+    });
+  }
+  function bindAntTools() {
+    var sel = $('addType');
+    Object.keys(E.PRESETS).forEach(function (k) { var o = document.createElement('option'); o.value = k; o.textContent = E.PRESETS[k].label; sel.appendChild(o); });
+    sel.value = 'patch';
+    $('addOne').addEventListener('click', function () {
+      if (S.ants.length >= E.MAX_ANTS) { antMsg('Limit reached: an array holds at most ' + E.MAX_ANTS + ' antennas.'); return; }
+      var a = E.mkAnt(sel.value, S, { az: 0, el: sel.value === 'monopole' ? 90 : 45 });
+      S.ants.push(a); selId = a.id; buildEditor(); changed();
+    });
+    $('addRing').addEventListener('click', function () {
+      var err = $('ringErr'), n = parseInt($('ringN').value, 10), el = parseFloat($('ringEl').value.replace(',', '.')), off = parseFloat($('ringOff').value.replace(',', '.'));
+      var m = '';
+      if (!isFinite(n) || n < 1 || n > 12) m = 'Ring count must be a whole number from 1 to 12.';
+      else if (!isFinite(el) || el < 0 || el > 90) m = 'Ring elevation must be between 0 and 90 degrees.';
+      else if (!isFinite(off) || off < 0 || off > 360) m = 'First azimuth must be between 0 and 360 degrees.';
+      else if (S.ants.length + n > E.MAX_ANTS) m = 'Only ' + (E.MAX_ANTS - S.ants.length) + ' more antennas fit (limit ' + E.MAX_ANTS + ').';
+      err.textContent = m; err.hidden = !m;
+      if (m) return;
+      var lab = E.PRESETS[sel.value].label;
+      for (var i = 0; i < n; i++) {
+        var a = E.mkAnt(sel.value, S, { az: (off + i * 360 / n) % 360, el: el });
+        a.name = (lab + ' ring ' + (i + 1)).slice(0, 28);
+        S.ants.push(a); selId = a.id;
+      }
+      buildEditor(); changed();
+    });
+    armConfirm($('resetAnts'), 'Reset example', function () { var d = E.defaultState(); S.ants = d.ants; S.nextId = d.nextId; V.solo = null; selId = S.ants[0].id; buildEditor(); changed(); });
+    armConfirm($('clearAnts'), 'Remove all', function () { S.ants = []; V.solo = null; selId = null; buildEditor(); changed(); });
+    $('alist').addEventListener('click', function (e) {
+      var card = e.target.closest('.acard'); if (!card) return;
+      var id = +card.dataset.id, a = S.ants[antIndex(id)], btn = e.target.closest('button');
+      if (btn && a) {
+        var act = btn.dataset.act;
+        if (act === 'outline') a.outline = !a.outline;
+        else if (act === 'solo') V.solo = V.solo === id ? null : id;
+        else if (act === 'power') a.enabled = !a.enabled;
+        if (id !== selId) { selId = id; buildEditor(); }
+        changed(); return;
+      }
+      if (id !== selId) { selId = id; buildEditor(); changed(); }
+    });
+  }
+
+  /* ---------- Colour ---------- */
+  function hex2rgb(h) {
+    h = String(h).trim();
+    if (h[0] === '#') { if (h.length === 4) h = '#' + h[1] + h[1] + h[2] + h[2] + h[3] + h[3]; return [parseInt(h.substr(1, 2), 16), parseInt(h.substr(3, 2), 16), parseInt(h.substr(5, 2), 16)]; }
+    var m = h.match(/\d+/g); return m ? [+m[0], +m[1], +m[2]] : [128, 128, 128];
+  }
+  function theme() {
+    var cs = getComputedStyle($('rf'));
+    function g(n) { return cs.getPropertyValue(n).trim(); }
+    var T = { bg: g('--bg'), surface: g('--surface2'), ink: g('--ink'), muted: g('--muted'), line: g('--line'), accent: g('--accent'), fail: g('--fail'), pass: g('--pass'), mid: g('--mid'), dn: g('--dn'), up: g('--up') };
+    var b = hex2rgb(T.bg); T.dark = (b[0] * 0.3 + b[1] * 0.59 + b[2] * 0.11) < 128;
+    T.bgRGB = b;
+    return T;
+  }
+  function ramp(stops, t) {
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    var x = t * (stops.length - 1), i = Math.min(stops.length - 2, Math.floor(x)), f = x - i, a = stops[i], b = stops[i + 1];
+    return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f];
+  }
+  function lut(stops) { var l = new Uint8ClampedArray(768); for (var i = 0; i < 256; i++) { var c = ramp(stops, i / 255); l[i * 3] = c[0]; l[i * 3 + 1] = c[1]; l[i * 3 + 2] = c[2]; } return l; }
+  var VIRIDIS = ['#440154', '#472d7b', '#3b528b', '#2c728e', '#21918c', '#28ae80', '#5ec962', '#addc30', '#fde725'].map(hex2rgb);
+  var POWER = ['#f9f4c0', '#f7c65c', '#ef8a3a', '#c2412d', '#7a1e4f', '#2a0a3d'].map(hex2rgb);
+  var BLUES = ['#c6dbef', '#8fbadf', '#5b93cf', '#2f62b0', '#0b2f6b'].map(hex2rgb);
+  function divStops(T) { return ['#a50f15', '#de5a3c', '#f2a17b', T.mid, '#8fc1de', '#3f8fc4', '#1d5f9f'].map(hex2rgb); }
+  function blend(c, bg, f) { return [c[0] * (1 - f) + bg[0] * f, c[1] * (1 - f) + bg[1] * f, c[2] * (1 - f) + bg[2] * f]; }
+  function tbl(colors) { var t = new Uint8ClampedArray(colors.length * 3); colors.forEach(function (c, i) { t[i * 3] = c[0]; t[i * 3 + 1] = c[1]; t[i * 3 + 2] = c[2]; }); return t; }
+
+  /* ---------- Fields and mappers ---------- */
+  function srcInfo() {
+    if (V.solo != null) { var k = antIndex(V.solo); if (k >= 0 && R.netG[k]) return { G: R.netG[k], k: k, sdn: R.sdnA[k], sup: R.supA[k], pout: R.info[k].poutDbw, slack: R.slackAnt[k] }; }
+    return { G: R.cGain, k: -1, sdn: R.cSdn, sup: R.cSup, pout: null, slack: R.slackBest };
+  }
+  function logField(fn) { var o = new Float32Array(E.N); for (var i = 0; i < E.N; i++) o[i] = fn(i); return o; }
+  function fieldFor(layer, src) {
+    var B = R.B;
+    switch (layer) {
+      case 'gain': return { kind: 'gain', arr: src.G };
+      case 'sdn': return { kind: 'sdn', arr: src.sdn };
+      case 'sup': return { kind: 'sup', arr: src.sup };
+      case 'reqSat': return { kind: 'reqSat', arr: logField(function (i) { return (B.psat - src.sdn[i]) / 10; }) };
+      case 'reqPA': return { kind: 'reqPA', arr: logField(function (i) { return ((src.k >= 0 ? src.pout : R.cPout[i]) - src.sup[i]) / 10; }) };
+      case 'serve':
+        if (src.k >= 0) return binField(src);
+        return { kind: 'serve', arr: R.idx };
+      default:
+        if (src.k >= 0) return binField(src);
+        return { kind: 'count', arr: R.count };
+    }
+  }
+  function binField(src) {
+    var b = new Uint8Array(E.N); for (var i = 0; i < E.N; i++) b[i] = src.slack[i] >= 0 ? 1 : 0;
+    return { kind: 'bin', arr: b, k: src.k };
+  }
+  function makeMapper(f, T) {
+    var bg = T.bgRGB;
+    switch (f.kind) {
+      case 'gain': return { lut: lut(VIRIDIS), lo: -10, hi: 16 };
+      case 'sdn': case 'sup': return { lut: lut(divStops(T)), lo: -12, hi: 12 };
+      case 'reqSat': case 'reqPA': return { lut: lut(POWER), lo: -1, hi: 2 };
+      case 'serve': {
+        var cols = [hex2rgb(T.mid)].concat(S.ants.map(function (a) { return hex2rgb(a.color); }));
+        return { tbl: tbl(cols), dim: tbl(cols.map(function (c) { return blend(c, bg, 0.62); })), off: 1 };
+      }
+      case 'bin': {
+        var ac = hex2rgb(S.ants[f.k].color), dm = blend(hex2rgb(T.mid), bg, 0.35);
+        return { tbl: tbl([dm, ac]), off: 0 };
+      }
+      default: {
+        var mx = 1; for (var i = 0; i < R.count.length; i++) if (R.count[i] > mx) mx = R.count[i];
+        var cc = [hex2rgb(T.fail)]; for (var c = 1; c <= Math.max(mx, 1); c++) cc.push(ramp(BLUES, mx > 1 ? (c - 1) / (mx - 1) : 0.4));
+        return { tbl: tbl(cc), off: 0, max: mx };
+      }
+    }
+  }
+  var TMP = [0, 0, 0];
+  function rgbAt(m, f, slk, i) {
+    var v = f.arr[i], t, j;
+    if (m.tbl) {
+      j = (v + m.off) * 3; var tb = (m.dim && slk[i] < 0) ? m.dim : m.tbl;
+      TMP[0] = tb[j]; TMP[1] = tb[j + 1]; TMP[2] = tb[j + 2];
+    } else {
+      t = (v - m.lo) / (m.hi - m.lo); t = t < 0 ? 0 : t > 1 ? 1 : t; j = ((t * 255) | 0) * 3;
+      TMP[0] = m.lut[j]; TMP[1] = m.lut[j + 1]; TMP[2] = m.lut[j + 2];
+    }
+    return TMP;
+  }
+  function bilinear(arr, az, el) {
+    var fa = az / 2, ia0 = fa | 0, wa = fa - ia0, ia1 = ia0 + 1 >= NA ? 0 : ia0 + 1;
+    var ie0 = el | 0; if (ie0 >= NE - 1) ie0 = NE - 2; var we = el - ie0;
+    var r0 = ie0 * NA, r1 = r0 + NA;
+    return (arr[r0 + ia0] * (1 - wa) + arr[r0 + ia1] * wa) * (1 - we) + (arr[r1 + ia0] * (1 - wa) + arr[r1 + ia1] * wa) * we;
+  }
+  function cellIndex(az, el) { return clamp(Math.round(el), 0, 90) * NA + (Math.round(az / 2) % NA); }
+
+  /* ---------- Canvas helpers ---------- */
+  function setupCanvas(cv, w, h) {
+    var dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    var ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+    return ctx;
+  }
+  function halo(ctx, text, x, y, T, fill) {
+    ctx.lineWidth = 3; ctx.strokeStyle = T.bg; ctx.lineJoin = 'round'; ctx.strokeText(text, x, y);
+    ctx.fillStyle = fill || T.ink; ctx.fillText(text, x, y);
+  }
+  function contrastInk(hex) { var c = hex2rgb(hex); return (c[0] * 0.3 + c[1] * 0.59 + c[2] * 0.11) > 150 ? '#111111' : '#ffffff'; }
+  function getContour(key, arr) { if (!R._c[key]) R._c[key] = E.contour(arr, 0); return R._c[key]; }
+  function vecAzEl(v) { var az = Math.atan2(v[0], v[1]) * R2D; if (az < 0) az += 360; return [az, Math.asin(clamp(v[2], -1, 1)) * R2D]; }
+
+  /* ---------- Sky plot ---------- */
+  var offCv = null;
+  function drawSky() {
+    var cv = $('sky'), css = Math.round(cv.parentElement.clientWidth);
+    if (css < 60) return;
+    var ctx = setupCanvas(cv, css, css), T = theme(), L = S.link;
+    var cx = css / 2, cy = css / 2, Rr = css / 2 - (css < 420 ? 22 : 30);
+    var src = srcInfo(), f = fieldFor(V.layer, src), m = makeMapper(f, T), slk = src.slack;
+    var OS = css;
+    if (!offCv) offCv = document.createElement('canvas');
+    offCv.width = OS; offCv.height = OS;
+    var octx = offCv.getContext('2d'), img = octx.createImageData(OS, OS), d = img.data, arr = f.arr, discrete = !!m.tbl;
+    var c0 = OS / 2, bg = T.bgRGB, ink = hex2rgb(T.ink), mask = L.mask, hatch = V.hatch;
+    for (var py = 0; py < OS; py++) {
+      for (var px = 0; px < OS; px++) {
+        var dx = px + 0.5 - c0, dy = c0 - (py + 0.5), r = Math.sqrt(dx * dx + dy * dy);
+        if (r > Rr) continue;
+        var el = 90 * (1 - r / Rr), az = Math.atan2(dx, dy) * R2D; if (az < 0) az += 360;
+        var ci = cellIndex(az, el), c;
+        if (discrete) c = rgbAt(m, f, slk, ci);
+        else {
+          var v = bilinear(arr, az, el), t = (v - m.lo) / (m.hi - m.lo); t = t < 0 ? 0 : t > 1 ? 1 : t;
+          var j = ((t * 255) | 0) * 3; TMP[0] = m.lut[j]; TMP[1] = m.lut[j + 1]; TMP[2] = m.lut[j + 2]; c = TMP;
+        }
+        var rr = c[0], gg = c[1], bb = c[2];
+        if (el < mask) { rr = rr * 0.35 + bg[0] * 0.65; gg = gg * 0.35 + bg[1] * 0.65; bb = bb * 0.35 + bg[2] * 0.65; }
+        else if (hatch && slk[ci] < 0 && ((px + py) % 7) < 2) { rr = rr * 0.55 + ink[0] * 0.45; gg = gg * 0.55 + ink[1] * 0.45; bb = bb * 0.55 + ink[2] * 0.45; }
+        var o = (py * OS + px) * 4; d[o] = rr; d[o + 1] = gg; d[o + 2] = bb; d[o + 3] = 255;
+      }
+    }
+    octx.putImageData(img, 0, 0);
+    ctx.drawImage(offCv, 0, 0, css, css);
+    function P(az, el) { var a = az * D2R, r = Rr * (1 - el / 90); return [cx + r * Math.sin(a), cy - r * Math.cos(a)]; }
+    function G(gx, gy) { return P(gx * 2, gy); }
+    // grid
+    ctx.lineWidth = 1; ctx.strokeStyle = T.ink; ctx.globalAlpha = 0.25;
+    [30, 60].forEach(function (e) { ctx.beginPath(); ctx.arc(cx, cy, Rr * (1 - e / 90), 0, 6.2832); ctx.stroke(); });
+    for (var a = 0; a < 360; a += 30) { var p = P(a, 0); ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(p[0], p[1]); ctx.stroke(); }
+    ctx.globalAlpha = 0.7; ctx.strokeStyle = T.muted; ctx.beginPath(); ctx.arc(cx, cy, Rr, 0, 6.2832); ctx.stroke();
+    if (mask > 0) { ctx.globalAlpha = 0.9; ctx.setLineDash([4, 3]); ctx.strokeStyle = T.ink; ctx.beginPath(); ctx.arc(cx, cy, Rr * (1 - mask / 90), 0, 6.2832); ctx.stroke(); ctx.setLineDash([]); }
+    ctx.globalAlpha = 1;
+    ctx.font = '11px ' + getComputedStyle(document.body).getPropertyValue('--f-mono'); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (a = 0; a < 360; a += 30) {
+      var card = a % 90 === 0, q = P(a, -(card ? 6 : 5) * 90 / Rr * (card ? 2.4 : 1.9));
+      var lab = a === 0 ? 'N' : a === 90 ? 'E' : a === 180 ? 'S' : a === 270 ? 'W' : String(a);
+      ctx.fillStyle = card ? T.ink : T.muted; ctx.font = (card ? '600 13px ' : '11px ') + 'sans-serif';
+      ctx.fillText(lab, q[0], q[1]);
+    }
+    ctx.font = '11px sans-serif';
+    [30, 60].forEach(function (e) { var q = P(45, e); halo(ctx, e + '°', q[0], q[1], T, T.muted); });
+    if (mask > 0) { var qm = P(225, mask); halo(ctx, 'mask ' + mask + '°', qm[0], qm[1], T, T.ink); }
+    // contours
+    function strokeSegs(segs, color, w) {
+      ctx.beginPath();
+      for (var i = 0; i < segs.length; i += 4) { var p1 = G(segs[i], segs[i + 1]), p2 = G(segs[i + 2], segs[i + 3]); ctx.moveTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]); }
+      ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      ctx.strokeStyle = T.bg; ctx.globalAlpha = 0.75; ctx.lineWidth = w + 2.5; ctx.stroke();
+      ctx.strokeStyle = color; ctx.globalAlpha = 1; ctx.lineWidth = w; ctx.stroke();
+    }
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cx, cy, Rr + 0.5, 0, 6.2832); ctx.clip();
+    if (V.outlines) {
+      S.ants.forEach(function (an, k) {
+        if (!R.slackAnt[k] || !an.outline || (src.k >= 0 && src.k !== k)) return;
+        strokeSegs(getContour('a' + k, R.slackAnt[k]), an.color, 1.6);
+      });
+      if (src.k < 0 && R.stats.active) strokeSegs(getContour('best', R.slackBest), T.ink, 2.6);
+    }
+    if (V.beams) {
+      S.ants.forEach(function (an, k) {
+        if (!R.netG[k] || !an.outline || (src.k >= 0 && src.k !== k)) return;
+        var pts = E.beamOutline(an, 3); if (!pts.length) return;
+        ctx.beginPath(); var pen = false;
+        pts.forEach(function (v) {
+          if (v[2] < 0) { pen = false; return; }
+          var ae = vecAzEl(v), p2 = P(ae[0], ae[1]);
+          if (pen) ctx.lineTo(p2[0], p2[1]); else { ctx.moveTo(p2[0], p2[1]); pen = true; }
+        });
+        ctx.setLineDash([5, 4]); ctx.lineWidth = 1.4; ctx.strokeStyle = an.color; ctx.globalAlpha = 0.95; ctx.stroke(); ctx.setLineDash([]);
+      });
+    }
+    ctx.restore(); ctx.globalAlpha = 1;
+    // boresights
+    V.hit = [];
+    if (V.bores) {
+      ctx.font = '600 10px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      S.ants.forEach(function (an, k) {
+        var p = P(an.az, an.el), on = an.enabled && R.valid[k].ok;
+        V.hit.push({ id: an.id, x: p[0], y: p[1] });
+        ctx.globalAlpha = on ? 1 : 0.4;
+        if (an.id === selId) { ctx.beginPath(); ctx.arc(p[0], p[1], 12, 0, 6.2832); ctx.lineWidth = 2; ctx.strokeStyle = T.accent; ctx.stroke(); }
+        ctx.beginPath(); ctx.arc(p[0], p[1], 8, 0, 6.2832); ctx.fillStyle = an.color; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = T.bg; ctx.stroke();
+        ctx.fillStyle = contrastInk(an.color); ctx.fillText(String(k + 1), p[0], p[1] + 0.5);
+      });
+      ctx.globalAlpha = 1;
+    }
+    if (V.dir) {
+      var pd = P(V.dir.az, V.dir.el);
+      ctx.lineWidth = 2; ctx.strokeStyle = T.bg; ctx.beginPath(); ctx.arc(pd[0], pd[1], 9, 0, 6.2832); ctx.stroke();
+      ctx.lineWidth = 1.5; ctx.strokeStyle = T.ink; ctx.beginPath(); ctx.arc(pd[0], pd[1], 9, 0, 6.2832); ctx.moveTo(pd[0] - 14, pd[1]); ctx.lineTo(pd[0] + 14, pd[1]); ctx.moveTo(pd[0], pd[1] - 14); ctx.lineTo(pd[0], pd[1] + 14); ctx.stroke();
+    }
+    cv._geo = { cx: cx, cy: cy, Rr: Rr, css: css };
+  }
+  function probeHTML(az, el) {
+    var ie = clamp(Math.round(el), 0, 90), i = cellIndex(az, el), B = R.B;
+    var k = R.idx[i];
+    var head = 'az ' + az.toFixed(0) + '° · el ' + el.toFixed(0) + '° · range ' + Math.round(B.slant[ie]) + ' km';
+    if (k < 0) return head + '<br>No active antenna covers this direction.';
+    var sd = R.cSdn[i], su = R.cSup[i];
+    return head + ' · ' + esc(S.ants[k].name) + ' (' + (k + 1) + ') at ' + R.cGain[i].toFixed(1) + ' dBi<br>' +
+      'Downlink ' + sgn(sd) + ' dB, satellite needs ' + fmtW(p10(B.psat - sd)) + ' · Uplink ' + sgn(su) + ' dB, PA output needs ' + fmtW(p10(R.cPout[i] - su)) + '. Click to load the link chain.';
+  }
+  var PROBE_HINT = 'Move over the plot to read a direction. Click empty sky to show its link chain, or a numbered marker to select that antenna.';
+  function bindSky() {
+    var cv = $('sky'), pr = $('probe');
+    function at(e) {
+      var g = cv._geo; if (!g || !R) return null;
+      var rc = cv.getBoundingClientRect(), s = g.css / rc.width, x = (e.clientX - rc.left) * s, y = (e.clientY - rc.top) * s;
+      var dx = x - g.cx, dy = g.cy - y, r = Math.sqrt(dx * dx + dy * dy);
+      return { x: x, y: y, r: r, az: (Math.atan2(dx, dy) * R2D + 360) % 360, el: 90 * (1 - r / g.Rr), g: g };
+    }
+    cv.addEventListener('pointermove', function (e) { var p = at(e); if (p && p.r <= p.g.Rr) pr.innerHTML = probeHTML(p.az, p.el); });
+    cv.addEventListener('pointerleave', function () { pr.textContent = PROBE_HINT; });
+    cv.addEventListener('pointerdown', function (e) {
+      var p = at(e); if (!p) return;
+      var best = null, bd = 14;
+      V.hit.forEach(function (h) { var dd = Math.hypot(h.x - p.x, h.y - p.y); if (dd < bd) { bd = dd; best = h; } });
+      if (best && best.id !== selId) { selId = best.id; buildEditor(); changed(); }
+      else if (p.r <= p.g.Rr) { V.dir = { az: p.az, el: Math.max(p.el, 0) }; pr.innerHTML = probeHTML(p.az, p.el); changed(); }
+    });
+  }
+
+
+  /* ---------- Indicative 3D antenna models (local frame: x along h, y along v, z along boresight) ---------- */
+  function sq(h, z) { return [[-h, -h, z], [h, -h, z], [h, h, z], [-h, h, z]]; }
+  function ringPts(r, z, n) { var o = []; for (var i = 0; i <= n; i++) { var a = i / n * 6.2832; o.push([r * Math.cos(a), r * Math.sin(a), z]); } return o; }
+  var MODELS = {
+    patch: function () { return [{ t: 'poly', p: sq(0.65, -0.06), k: 0.45 }, { t: 'poly', p: sq(0.42, 0), k: 1 }]; },
+    qha: function () {
+      var out = [{ t: 'poly', p: sq(0.4, -0.64), k: 0.35 }];
+      for (var k = 0; k < 4; k++) { var pts = []; for (var i = 0; i <= 24; i++) { var t = i / 24, a = k * Math.PI / 2 + t * Math.PI; pts.push([0.28 * Math.cos(a), 0.28 * Math.sin(a), -0.6 + 1.2 * t]); } out.push({ t: 'line', p: pts, w: 2 }); }
+      return out;
+    },
+    helix: function () {
+      var pts = []; for (var i = 0; i <= 96; i++) { var t = i / 96, a = t * 6 * 6.2832; pts.push([0.25 * Math.cos(a), 0.25 * Math.sin(a), 0.05 + 1.3 * t]); }
+      return [{ t: 'poly', p: sq(0.45, 0), k: 0.45 }, { t: 'line', p: pts, w: 2 }];
+    },
+    yagi: function () {
+      var out = [{ t: 'line', p: [[0, 0, -0.7], [0, 0, 1.0]], w: 2.5 }, { t: 'line', p: [[-0.55, 0, -0.6], [0.55, 0, -0.6]], w: 2 }, { t: 'line', p: [[-0.5, 0, -0.35], [0.5, 0, -0.35]], w: 2 }];
+      for (var j = 0; j < 6; j++) { var L = 0.45 - 0.03 * j, z = -0.05 + 0.19 * j; out.push({ t: 'line', p: [[-L, 0, z], [L, 0, z]], w: 2 }); }
+      return out;
+    },
+    turnstile: function () {
+      return [{ t: 'poly', p: sq(0.5, 0), k: 0.45 }, { t: 'line', p: [[0, 0, 0], [0, 0, 0.22]], w: 2 },
+        { t: 'line', p: [[-0.42, 0, 0.22], [0.42, 0, 0.22]], w: 2.5 }, { t: 'line', p: [[0, -0.42, 0.22], [0, 0.42, 0.22]], w: 2.5 }];
+    },
+    horn: function () {
+      var th = sq(0.1, -0.7), ap = sq(0.5, 0.3), out = [];
+      for (var i = 0; i < 4; i++) { var j = (i + 1) % 4; out.push({ t: 'poly', p: [th[i], th[j], ap[j], ap[i]], k: 0.55 }); }
+      out.push({ t: 'poly', p: ap, k: 0.2 });
+      return out;
+    },
+    dish: function () {
+      var out = [], i, r;
+      [0.25, 0.5, 0.75].forEach(function (rr) { out.push({ t: 'line', p: ringPts(rr, rr * rr * 0.5, 24), w: 1.6 }); });
+      for (i = 0; i < 8; i++) { var a = i / 8 * 6.2832, pts = []; for (r = 0; r <= 0.751; r += 0.125) pts.push([r * Math.cos(a), r * Math.sin(a), r * r * 0.5]); out.push({ t: 'line', p: pts, w: 1.4 }); }
+      out.push({ t: 'line', p: [[0, 0, 0], [0, 0, 0.5]], w: 2.5 });
+      return out;
+    },
+    dipole: function () { return [{ t: 'line', p: [[0, 0, -0.7], [0, 0, -0.06]], w: 3.5 }, { t: 'line', p: [[0, 0, 0.06], [0, 0, 0.7]], w: 3.5 }]; },
+    monopole: function () { return [{ t: 'poly', p: sq(0.6, 0), k: 0.45 }, { t: 'line', p: [[0, 0, 0], [0, 0, 1.2]], w: 3.5 }]; },
+    custom: function () {
+      var out = [{ t: 'line', p: ringPts(0.5, 0.5, 24), w: 1.6 }];
+      for (var i = 0; i < 8; i++) { var a = i / 8 * 6.2832; out.push({ t: 'line', p: [[0, 0, -0.4], [0.5 * Math.cos(a), 0.5 * Math.sin(a), 0.5]], w: 1.4 }); }
+      return out;
+    }
+  };
+  function collectModelItems(proj, T) {
+    var items = [], rMod = 0.66, sc = 0.14;
+    S.ants.forEach(function (an, k) {
+      if (V.solo != null && an.id !== V.solo) return;
+      var on = an.enabled && R.valid[k].ok, fr = E.frame(an), mk = MODELS[an.type] || MODELS.custom, sel = an.id === selId;
+      function wp(pt) {
+        var x = pt[0] * sc, y = pt[1] * sc, z = pt[2] * sc;
+        return proj(fr.b[0] * rMod + x * fr.h[0] + y * fr.v[0] + z * fr.b[0], fr.b[1] * rMod + x * fr.h[1] + y * fr.v[1] + z * fr.b[1], fr.b[2] * rMod + x * fr.h[2] + y * fr.v[2] + z * fr.b[2]);
+      }
+      mk().forEach(function (pr) {
+        var pp = pr.p.map(wp), d = 0; pp.forEach(function (q) { d += q[2]; }); d /= pp.length;
+        items.push({ d: d, t: pr.t, pp: pp, k: pr.k, w: pr.w || 2, color: an.color, alpha: on ? 1 : 0.35, sel: sel });
+      });
+    });
+    items.sort(function (a, b) { return a.d - b.d; });
+    return items;
+  }
+  function drawModelItems(ctx, items, T) {
+    items.forEach(function (it) {
+      ctx.beginPath(); ctx.moveTo(it.pp[0][0], it.pp[0][1]);
+      for (var i = 1; i < it.pp.length; i++) ctx.lineTo(it.pp[i][0], it.pp[i][1]);
+      if (it.t === 'poly') {
+        ctx.closePath();
+        ctx.globalAlpha = it.alpha * (it.k || 1); ctx.fillStyle = it.color; ctx.fill();
+        ctx.globalAlpha = it.alpha; ctx.lineWidth = it.sel ? 1.6 : 1; ctx.strokeStyle = it.sel ? T.accent : T.ink; ctx.stroke();
+      } else {
+        ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+        ctx.globalAlpha = it.alpha * 0.85; ctx.lineWidth = it.w + 2.5; ctx.strokeStyle = T.bg; ctx.stroke();
+        ctx.globalAlpha = it.alpha; ctx.lineWidth = it.w; ctx.strokeStyle = it.color; ctx.stroke();
+      }
+    });
+    ctx.globalAlpha = 1;
+  }
+
+  /* ---------- 3D dome ---------- */
+  function drawDome() {
+    var cv = $('dome'), css = Math.round(cv.parentElement.clientWidth);
+    if (css < 60) return;
+    var ctx = setupCanvas(cv, css, css), T = theme(), L = S.link;
+    var src = srcInfo(), f = fieldFor(V.layer, src), m = makeMapper(f, T), slk = src.slack, bg = T.bgRGB;
+    var yaw = V.cam.yaw * D2R, pit = V.cam.pitch * D2R, cyw = Math.cos(yaw), syw = Math.sin(yaw), cp = Math.cos(pit), sp = Math.sin(pit);
+    var s = css * 0.4, ox = css / 2, oy = css / 2 + s * 0.22 * cp;
+    function proj(x, y, z) { var x1 = x * cyw - y * syw, y1 = x * syw + y * cyw; return [ox + s * x1, oy - s * (z * cp + y1 * sp), -y1 * cp + z * sp]; }
+    function sph(az, el, r) { var a = az * D2R, e = el * D2R, ce = Math.cos(e); return [r * ce * Math.sin(a), r * ce * Math.cos(a), r * Math.sin(e)]; }
+    // ground disc
+    ctx.beginPath();
+    for (var a = 0; a <= 360; a += 6) { var q = sph(a, 0, 1), p = proj(q[0], q[1], q[2]); if (a === 0) ctx.moveTo(p[0], p[1]); else ctx.lineTo(p[0], p[1]); }
+    ctx.closePath(); ctx.fillStyle = T.surface; ctx.globalAlpha = 0.8; ctx.fill(); ctx.globalAlpha = 1;
+    // quads
+    var quads = [], DA = 4, DE = 3;
+    for (var az0 = 0; az0 < 360; az0 += DA) {
+      for (var el0 = 0; el0 < 90; el0 += DE) {
+        var cen = sph(az0 + DA / 2, el0 + DE / 2, 1), pc = proj(cen[0], cen[1], cen[2]);
+        var cols = rgbAt(m, f, slk, cellIndex(az0 + DA / 2, el0 + DE / 2)), r = cols[0], g = cols[1], b = cols[2];
+        if (el0 + DE / 2 < L.mask) { r = r * 0.35 + bg[0] * 0.65; g = g * 0.35 + bg[1] * 0.65; b = b * 0.35 + bg[2] * 0.65; }
+        var cs = [sph(az0, el0, 1), sph(az0 + DA, el0, 1), sph(az0 + DA, el0 + DE, 1), sph(az0, el0 + DE, 1)].map(function (v) { return proj(v[0], v[1], v[2]); });
+        quads.push({ d: pc[2], cs: cs, c: 'rgb(' + (r | 0) + ',' + (g | 0) + ',' + (b | 0) + ')' });
+      }
+    }
+    quads.sort(function (x, y) { return x.d - y.d; });
+    quads.forEach(function (q) {
+      var front = q.d > 0;
+      ctx.globalAlpha = front ? 1 : 0.2;
+      ctx.beginPath(); ctx.moveTo(q.cs[0][0], q.cs[0][1]); for (var i = 1; i < 4; i++) ctx.lineTo(q.cs[i][0], q.cs[i][1]); ctx.closePath();
+      ctx.fillStyle = q.c; ctx.fill();
+      if (front) { ctx.strokeStyle = q.c; ctx.lineWidth = 0.7; ctx.stroke(); }
+    });
+    ctx.globalAlpha = 1;
+    // horizon and mask rings
+    function ring(el, dash, w, alpha) {
+      ctx.beginPath();
+      for (var a2 = 0; a2 <= 360; a2 += 4) { var q2 = sph(a2, el, 1.003), p2 = proj(q2[0], q2[1], q2[2]); if (a2 === 0) ctx.moveTo(p2[0], p2[1]); else ctx.lineTo(p2[0], p2[1]); }
+      ctx.setLineDash(dash); ctx.lineWidth = w; ctx.strokeStyle = T.ink; ctx.globalAlpha = alpha; ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+    }
+    ring(0, [], 1.5, 0.7);
+    if (L.mask > 0) ring(L.mask, [4, 3], 1, 0.8);
+    ctx.font = '600 13px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    [[0, 'N'], [90, 'E'], [180, 'S'], [270, 'W']].forEach(function (c) { var q3 = sph(c[0], 0, 1.13), p3 = proj(q3[0], q3[1], q3[2]); halo(ctx, c[1], p3[0], p3[1], T, T.ink); });
+    // beams and rays
+    S.ants.forEach(function (an, k) {
+      if (!R.netG[k] || (src.k >= 0 && src.k !== k)) return;
+      var sel = an.id === selId, c0 = proj(0, 0, 0), bv = E.frame(an).b, tip = proj(bv[0] * 1.16, bv[1] * 1.16, bv[2] * 1.16);
+      ctx.beginPath(); ctx.moveTo(c0[0], c0[1]); ctx.lineTo(tip[0], tip[1]); ctx.lineWidth = sel ? 3 : 1.6; ctx.strokeStyle = an.color; ctx.stroke();
+      var badge = proj(bv[0] * 1.2, bv[1] * 1.2, bv[2] * 1.2);
+      if (sel) { ctx.beginPath(); ctx.arc(badge[0], badge[1], 13, 0, 6.2832); ctx.lineWidth = 2; ctx.strokeStyle = T.accent; ctx.stroke(); }
+      ctx.beginPath(); ctx.arc(badge[0], badge[1], 9, 0, 6.2832); ctx.fillStyle = an.color; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = T.bg; ctx.stroke();
+      ctx.font = '600 10px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = contrastInk(an.color); ctx.fillText(String(k + 1), badge[0], badge[1] + 0.5);
+      if (sel) { ctx.font = '600 12px sans-serif'; halo(ctx, an.name, badge[0], badge[1] - 20, T, T.ink); }
+      if (V.beams && an.outline) {
+        var pts = E.beamOutline(an, 3);
+        if (pts.length) {
+          ctx.beginPath(); var pen = false;
+          pts.forEach(function (v) {
+            var pp = proj(v[0] * 1.006, v[1] * 1.006, v[2] * 1.006);
+            if (v[2] < 0 || pp[2] < 0) { pen = false; return; }
+            if (pen) ctx.lineTo(pp[0], pp[1]); else { ctx.moveTo(pp[0], pp[1]); pen = true; }
+          });
+          ctx.lineWidth = 1.6; ctx.strokeStyle = an.color; ctx.stroke();
+        }
+      }
+    });
+    if (V.models) drawModelItems(ctx, collectModelItems(proj, T), T);
+  }
+  function bindDome() {
+    var cv = $('dome'), drag = null;
+    cv.addEventListener('pointerdown', function (e) { drag = { x: e.clientX, y: e.clientY }; cv.setPointerCapture(e.pointerId); });
+    cv.addEventListener('pointermove', function (e) {
+      if (!drag) return;
+      V.cam.yaw -= (e.clientX - drag.x) * 0.4; V.cam.pitch = clamp(V.cam.pitch + (e.clientY - drag.y) * 0.3, 4, 90);
+      drag = { x: e.clientX, y: e.clientY }; drawDome();
+    });
+    cv.addEventListener('pointerup', function () { drag = null; });
+    cv.addEventListener('pointercancel', function () { drag = null; });
+  }
+
+  /* ---------- Legend ---------- */
+  function renderLegend() {
+    var T = theme(), src = srcInfo(), f = fieldFor(V.layer, src), m = makeMapper(f, T), host = $('legend'), h = '';
+    function bar(ticks) {
+      var stops = [];
+      for (var i = 0; i <= 12; i++) { var t = i / 12, j = ((t * 255) | 0) * 3; stops.push('rgb(' + m.lut[j] + ',' + m.lut[j + 1] + ',' + m.lut[j + 2] + ') ' + (t * 100).toFixed(0) + '%'); }
+      var tk = ticks.map(function (t) { return '<span style="left:' + (t[0] * 100).toFixed(1) + '%">' + t[1] + '</span>'; }).join('');
+      return '<div class="lg-bar" style="background:linear-gradient(90deg,' + stops.join(',') + ')"></div><div class="lg-ticks">' + tk + '</div>';
+    }
+    switch (f.kind) {
+      case 'gain': h = bar([[0, '-10'], [10 / 26, '0'], [20 / 26, '10 dBi'], [1, '16']]); break;
+      case 'sdn': case 'sup': h = bar([[0, '-12'], [0.25, '-6'], [0.5, '0 dB = target met'], [0.75, '+6'], [1, '+12']]); break;
+      case 'reqSat': h = bar([[0, '0.1 W'], [1 / 3, '1 W'], [2 / 3, '10 W'], [1, '100 W']]); break;
+      case 'reqPA': h = bar([[0, '0.1 W'], [1 / 3, '1 W'], [2 / 3, '10 W'], [1, '100 W']]) + '<div class="sub" style="margin-top:4px">Output power each serving antenna\'s own PA must deliver.</div>'; break;
+      case 'serve': h = '<div class="lg-chips">' + S.ants.map(function (a, k) { return '<span><i style="background:' + a.color + '"></i>' + (k + 1) + ' ' + esc(a.name) + '</span>'; }).join('') + '</div><div class="sub" style="margin-top:4px">Colour is the antenna with the most gain. Faded cells do not close the link.</div>'; break;
+      case 'bin': h = '<div class="lg-chips"><span><i style="background:' + S.ants[f.k].color + '"></i>Closes the link with this antenna alone</span><span><i style="background:' + T.mid + '"></i>Does not close</span></div>'; break;
+      default: {
+        var cc = []; for (var c = 0; c <= (m.max || 1); c++) { var o = c * 3; cc.push('<span><i style="background:rgb(' + m.tbl[o] + ',' + m.tbl[o + 1] + ',' + m.tbl[o + 2] + ')"></i>' + c + (c === 0 ? ' (gap)' : '') + '</span>'); }
+        h = '<div class="lg-chips">' + cc.join('') + '</div><div class="sub" style="margin-top:4px">Number of antennas that close the link in each direction. 1 means no backup.</div>';
+      }
+    }
+    host.innerHTML = h;
+    var sb = $('soloBar');
+    if (src.k >= 0) sb.innerHTML = 'Solo view: <b>' + esc(S.ants[src.k].name) + '</b> only. <button type="button" class="btn sm" id="soloOff">Show whole array</button>';
+    else sb.textContent = '';
+    var so = $('soloOff'); if (so) so.addEventListener('click', function () { V.solo = null; changed(); });
+  }
+
+  /* ---------- Results ---------- */
+  function renderResults() {
+    var st = R.stats, L = S.link, w = st.worst;
+    function cls(ok, mid) { return ok ? 'pass' : mid ? 'warnc' : 'fail'; }
+    var cov = st.cov, k = [];
+    k.push('<div class="kpi"><div class="k">Sky closed above ' + L.mask + '°</div><div class="v ' + cls(cov >= 99.5, cov >= 90) + '">' + cov.toFixed(1) + '%</div><div class="s">Downlink ' + st.dn.toFixed(1) + '% · Uplink ' + st.up.toFixed(1) + '%</div></div>');
+    if (st.active) {
+      var sn = w.idx >= 0 ? esc(S.ants[w.idx].name) : 'no antenna';
+      k.push('<div class="kpi"><div class="k">Weakest direction</div><div class="v ' + cls(w.slack >= 0) + '">' + sgn(w.slack) + ' dB</div><div class="s">az ' + w.az.toFixed(0) + '° el ' + w.el.toFixed(0) + '° via ' + sn + '. Zero means the required margin is just met.</div></div>');
+      k.push('<div class="kpi"><div class="k">Satellite Tx to close downlink everywhere</div><div class="v ' + cls(st.reqSatW <= L.satPtxW, false) + '">' + fmtW(st.reqSatW) + '</div><div class="s">You set ' + fmtW(L.satPtxW) + (L.need === 'up' ? '. Downlink is not required.' : '. Or lower the data rate.') + '</div></div>');
+      k.push('<div class="kpi"><div class="k">Largest PA output needed</div><div class="v ' + cls(st.paOk === st.paCount, false) + '">' + (st.maxPaW == null ? 'n/a' : fmtW(st.maxPaW)) + '</div><div class="s">' + st.paOk + ' of ' + st.paCount + ' serving antennas close the uplink with their own PA' + (L.need === 'down' ? '. Uplink is not required.' : '.') + '</div></div>');
+      if (PM && PM.exists) k.push('<div class="kpi"><div class="k">' + (L.need === 'up' ? 'Uplink' : 'Downlink') + ' data in a ' + L.passEl + '° pass</div><div class="v ' + cls(PM.stats.fracClosed > 0.9, PM.stats.fracClosed > 0.4) + '">' + fmtBytes(L.need === 'up' ? PM.stats.kbUp : PM.stats.kbDn) + '</div><div class="s">Link closed ' + fmtT(PM.stats.tClosed) + ' of ' + fmtT(PM.stats.tAbove) + ' above the mask. Details in the Pass simulator.</div></div>');
+    } else k.push('<div class="kpi"><div class="k">Array</div><div class="v fail">Empty</div><div class="s">Add or enable an antenna.</div></div>');
+    $('kpis').innerHTML = k.join('');
+    $('resultSub').textContent = 'Best-of switching, worst direction above the mask';
+    var issues = E.validate(S, R);
+    $('checks').innerHTML = issues.length ? issues.map(function (i) { return '<li><span class="badge ' + i.level + '">' + (i.level === 'error' ? 'Blocked' : i.level === 'warn' ? 'Check' : 'Note') + '</span><span>' + esc(i.msg) + '</span></li>'; }).join('')
+      : '<li><span class="badge info">OK</span><span>All inputs are consistent.</span></li>';
+  }
+  function renderChips() {
+    var L = S.link;
+    $('chips').innerHTML = [L.altKm + ' km', L.mask + '° mask', fmtNum(L.rateDn) + ' / ' + fmtNum(L.rateUp) + ' kbps', E.MODS[L.mod].label.split(' (')[0] + ', ' + E.CODES[L.coding].label.split(',')[0].split(' (')[0], E.SATS[L.satType].label.split(',')[0] + (L.satAtt === 'tumble' ? ', tumbling' : ', nadir'), L.satPtxW + ' W'].map(function (c) { return '<span class="chip">' + esc(c) + '</span>'; }).join('');
+  }
+
+  /* ---------- Margin chart ---------- */
+  function axisSetup(cv, padB, padR) {
+    var box = cv.parentElement, W = box.clientWidth, H = box.clientHeight;
+    if (W < 60) return null;
+    var ctx = setupCanvas(cv, W, H), pad = { l: 46, r: padR || 10, t: 8, b: padB };
+    return { ctx: ctx, W: W, H: H, pad: pad, pw: W - pad.l - pad.r, ph: H - pad.t - pad.b, T: theme() };
+  }
+  function gridY(A, lo, hi, stepY, title) {
+    var ctx = A.ctx, T = A.T, pad = A.pad;
+    ctx.font = '12px sans-serif'; ctx.textBaseline = 'middle'; ctx.textAlign = 'right';
+    for (var g = lo; g <= hi; g += stepY) {
+      var y = pad.t + A.ph * (1 - (g - lo) / (hi - lo));
+      ctx.strokeStyle = T.line; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(A.W - pad.r, y); ctx.stroke();
+      ctx.fillStyle = T.muted; ctx.fillText(String(g), pad.l - 6, y);
+    }
+    ctx.save(); ctx.translate(11, pad.t + A.ph / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = 'center'; ctx.fillStyle = T.muted; ctx.fillText(title, 0, 0); ctx.restore();
+  }
+  function gridX(A, extra) {
+    var ctx = A.ctx, T = A.T, pad = A.pad, L = S.link;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.font = '12px sans-serif'; ctx.fillStyle = T.muted;
+    for (var e = 0; e <= 90; e += 15) {
+      var x = pad.l + A.pw * e / 90;
+      ctx.fillText(e + '°', x, A.H - pad.b + 6);
+      if (extra) ctx.fillText(E.etaOfElev(e, L.altKm).toFixed(0) + '°', x, A.H - pad.b + 20);
+    }
+    ctx.fillText(extra ? 'Elevation (top row), angle off the satellite nadir (bottom row)' : 'Elevation', pad.l + A.pw / 2, A.H - (extra ? 12 : 14));
+  }
+  function drawChart() {
+    var cv = $('chart'), A = axisSetup(cv, 30); if (!A) return;
+    var ctx = A.ctx, T = A.T, P = R.prof, L = S.link, mi = R.mi, pad = A.pad, pw = A.pw, ph = A.ph, i;
+    var rd = L.need !== 'up', ru = L.need !== 'down', mn = -5, mx = 5;
+    for (i = mi; i < NE; i++) {
+      if (rd) { mn = Math.min(mn, P.dnMin[i]); mx = Math.max(mx, P.dnMax[i]); }
+      if (ru) { mn = Math.min(mn, P.upMin[i]); mx = Math.max(mx, P.upMax[i]); }
+    }
+    var lo = clamp(Math.floor((mn - 1) / 10) * 10, -50, -10), hi = clamp(Math.ceil((mx + 1) / 10) * 10, 10, 60), stepY = hi - lo > 60 ? 20 : 10;
+    function X(e) { return pad.l + pw * e / 90; }
+    function Y(g) { return pad.t + ph * (1 - (clamp(g, lo, hi) - lo) / (hi - lo)); }
+    gridY(A, lo, hi, stepY, 'Margin over target, dB'); gridX(A, false);
+    if (mi > 0) { ctx.fillStyle = T.muted; ctx.globalAlpha = 0.18; ctx.fillRect(X(0), pad.t, X(mi) - X(0), ph); ctx.globalAlpha = 1; }
+    function link(mnA, mxA, meanA, color) {
+      ctx.beginPath();
+      for (i = 0; i < NE; i++) { if (i === 0) ctx.moveTo(X(i), Y(mxA[i])); else ctx.lineTo(X(i), Y(mxA[i])); }
+      for (i = NE - 1; i >= 0; i--) ctx.lineTo(X(i), Y(mnA[i]));
+      ctx.closePath(); ctx.fillStyle = color; ctx.globalAlpha = 0.16; ctx.fill(); ctx.globalAlpha = 1;
+      ctx.beginPath(); for (i = 0; i < NE; i++) { if (i === 0) ctx.moveTo(X(i), Y(meanA[i])); else ctx.lineTo(X(i), Y(meanA[i])); }
+      ctx.setLineDash([2, 3]); ctx.lineWidth = 1.3; ctx.strokeStyle = color; ctx.stroke(); ctx.setLineDash([]);
+      ctx.beginPath(); for (i = 0; i < NE; i++) { if (i === 0) ctx.moveTo(X(i), Y(mnA[i])); else ctx.lineTo(X(i), Y(mnA[i])); }
+      ctx.lineWidth = 2.2; ctx.strokeStyle = color; ctx.stroke();
+    }
+    if (R.stats.active) { if (rd) link(P.dnMin, P.dnMax, P.dnMean, T.dn); if (ru) link(P.upMin, P.upMax, P.upMean, T.up); }
+    ctx.beginPath(); ctx.moveTo(pad.l, Y(0)); ctx.lineTo(A.W - pad.r, Y(0)); ctx.lineWidth = 1.6; ctx.strokeStyle = T.ink; ctx.stroke();
+    var gaps = [], start = -1, wd = 1e9, wu = 1e9;
+    for (i = mi; i <= NE; i++) {
+      var bad = i < NE && P.slackMin[i] < 0;
+      if (i < NE) { wd = Math.min(wd, P.dnMin[i]); wu = Math.min(wu, P.upMin[i]); }
+      if (bad) { ctx.fillStyle = T.fail; ctx.fillRect(X(i) - pw / 180, A.H - pad.b - 5, pw / 90 + 0.5, 5); }
+      if (bad && start < 0) start = i;
+      if (!bad && start >= 0) { gaps.push(start === i - 1 ? start + '°' : start + '-' + (i - 1) + '°'); start = -1; }
+    }
+    $('chartLegend').innerHTML = (rd ? '<span><i style="border-color:' + T.dn + '"></i>Downlink, weakest azimuth</span>' : '') + (ru ? '<span><i style="border-color:' + T.up + '"></i>Uplink, weakest azimuth</span>' : '') +
+      '<span><i class="d" style="border-color:' + T.muted + '"></i>Mean over azimuth</span><span><i class="band"></i>Weakest to strongest azimuth</span><span><i style="border-color:' + T.ink + '"></i>Zero: required margin</span>';
+    var lim = (rd && ru) ? (wd <= wu ? 'Downlink is the limiting link' : 'Uplink is the limiting link') : '';
+    $('chartNote').textContent = !R.stats.active ? 'No active antennas.' : (gaps.length ? 'Weakest azimuth falls below zero at elevations ' + gaps.join(', ') + ' (red marks). ' + lim + (lim ? '. ' : '') + 'Options: add or re-aim antennas, a bigger PA, a lower data rate, or more satellite power.' : 'Every azimuth meets the required margin at every elevation above the mask.');
+  }
+
+  /* ---------- Satellite antenna chart ---------- */
+  var SAT_COL = { whip: '#a06ad6', turn: '#00a37a', qha: '#e69f00', dual: '#2f9de4', patch: '#d55e00', iso: '#e0559a', custom: '#7a8b99' };
+  function drawSatChart() {
+    var cv = $('satChart'), A = axisSetup(cv, 44); if (!A) return;
+    var ctx = A.ctx, T = A.T, P = R.prof, L = S.link, mi = R.mi, pad = A.pad, pw = A.pw, ph = A.ph, e;
+    var rd = L.need !== 'up', ru = L.need !== 'down', need = [], curves = E.satOptionCurves(L);
+    for (e = 0; e < NE; e++) { var v = -1e9; if (rd) v = Math.max(v, P.needDn[e]); if (ru) v = Math.max(v, P.needUp[e]); need.push(R.stats.active ? v : 0); }
+    var mx = 8, mnn = 0; for (e = mi; e < NE; e++) { mx = Math.max(mx, need[e]); }
+    Object.keys(curves).forEach(function (k) { for (var j = mi; j < NE; j++) { mx = Math.max(mx, curves[k][j]); mnn = Math.min(mnn, curves[k][j]); } });
+    var lo = clamp(Math.floor((mnn - 1) / 5) * 5, -20, -5), hi = clamp(Math.ceil((mx + 1) / 5) * 5, 10, 40);
+    function X(el) { return pad.l + pw * el / 90; }
+    function Y(g) { return pad.t + ph * (1 - (clamp(g, lo, hi) - lo) / (hi - lo)); }
+    gridY(A, lo, hi, 5, 'Satellite antenna gain, dBi'); gridX(A, true);
+    if (mi > 0) { ctx.fillStyle = T.muted; ctx.globalAlpha = 0.18; ctx.fillRect(X(0), pad.t, X(mi) - X(0), ph); ctx.globalAlpha = 1; }
+    function line(arr, color, w, dash) { ctx.beginPath(); for (var j = 0; j < NE; j++) { if (j === 0) ctx.moveTo(X(j), Y(arr[j])); else ctx.lineTo(X(j), Y(arr[j])); } ctx.setLineDash(dash || []); ctx.lineWidth = w; ctx.strokeStyle = color; ctx.stroke(); ctx.setLineDash([]); }
+    var ok = [];
+    Object.keys(curves).forEach(function (k) {
+      var sel = k === L.satType;
+      line(curves[k], SAT_COL[k], sel ? 2.6 : 1.3);
+      var pass = R.stats.active; for (var j = mi; j < NE; j++) if (curves[k][j] < need[j]) { pass = false; break; }
+      if (pass) ok.push(E.SATS[k].label);
+    });
+    line(need, T.ink, 2.2, [7, 4]);
+    $('satLegend').innerHTML = Object.keys(curves).map(function (k) {
+      return '<span' + (k === L.satType ? ' style="font-weight:500;color:var(--ink)"' : '') + '><i style="border-color:' + SAT_COL[k] + '"></i>' + esc(E.SATS[k].label) + '</span>';
+    }).join('') + '<span><i class="d" style="border-color:' + T.ink + '"></i>Gain needed at ' + L.satPtxW + ' W</span>';
+    var t = E.SATS[L.satType], mode = L.satAtt === 'tumble' ? 'Tumbling: each option is the gain exceeded in ' + L.tumbleP + '% of orientations, so it is flat.' : 'Nadir-pointed: gain falls off toward low elevations as the ground station moves away from nadir.';
+    $('satNote').textContent = mode + ' ' + (ok.length ? 'Options that meet the need at every elevation above the mask: ' + ok.join(', ') + '.' : 'No option closes every elevation at ' + L.satPtxW + ' W and ' + fmtNum(L.rateDn) + ' kbps. Raise satellite power, lower the rate, or add ground antenna gain.');
+  }
+
+  /* ---------- Link chain waterfall ---------- */
+  function chainBlock(title, part, cls) {
+    var rows = part.rows, lo = 1e9, hi = -1e9;
+    rows.forEach(function (r) { lo = Math.min(lo, r.level); hi = Math.max(hi, r.level); });
+    var span = Math.max(1, hi - lo);
+    function pos(v) { return (v - lo) / span * 100; }
+    var h = '<div class="lc ' + cls + '"><div class="lct"><b>' + title + '</b><span class="pill ' + (part.margin >= 0 ? 'pass' : 'fail') + '">' + sgn(part.margin) + ' dB over target</span></div>', prev = null;
+    rows.forEach(function (r) {
+      var a, b, k;
+      if (r.kind === 'start' || r.kind === 'total') { a = lo; b = r.level; k = 'tot'; }
+      else { a = Math.min(prev, r.level); b = Math.max(prev, r.level); k = r.kind === 'gain' ? 'g' : 'l'; }
+      h += '<div class="cr ' + k + '"><span class="cn">' + esc(r.label) + '</span><span class="ct"><i style="left:' + pos(a).toFixed(1) + '%;width:' + Math.max(1.2, pos(b) - pos(a)).toFixed(1) + '%"></i></span><span class="cd">' + (r.delta == null ? '' : sgn(r.delta)) + '</span><span class="cv">' + r.level.toFixed(1) + '</span></div>';
+      prev = r.level;
+    });
+    h += '<dl class="cinfo">' + part.info.map(function (x) { return '<dt>' + x[0] + '</dt><dd' + (x[2] ? ' class="' + (x[2] === 'pass' ? 'okc' : 'bad') + '"' : '') + '>' + x[1] + '</dd>'; }).join('') + '</dl></div>';
+    return h;
+  }
+  function renderChain() {
+    var host = $('chain'), w = R.stats.worst, d = V.dir || { az: w.az, el: w.el };
+    $('chainDir').textContent = 'az ' + d.az.toFixed(0) + '° · el ' + d.el.toFixed(0) + '°' + (V.dir ? '' : ' (weakest direction)');
+    $('chainWorst').hidden = !V.dir;
+    var c = R.stats.active ? E.chain(S, R, d.az, d.el) : null;
+    if (!c) { host.innerHTML = '<p class="sub" style="margin:0">No active antenna covers this direction.</p>'; return; }
+    host.innerHTML = '<p class="sub" style="margin:0 0 8px">Served by <b>' + esc(S.ants[c.k].name) + '</b> (' + (c.k + 1) + '). Levels in dBm, bars show where each step moves the signal. Click the sky plot to change direction.</p><div class="lchain">' +
+      chainBlock('Downlink: satellite to ground', c.dn, 'dn') + chainBlock('Uplink: ground Pluto and PA to satellite', c.up, 'up') + '</div>';
+  }
+
+  /* ---------- Pattern cuts ---------- */
+  function drawCut() {
+    var cv = $('cut'), a = curAnt(); if (!cv || !a) return;
+    var box = cv.parentElement, W = box.clientWidth, H = box.clientHeight; if (W < 40) return;
+    var ctx = setupCanvas(cv, W, H), T = theme(), cx = W / 2, cy = H / 2, Rp = W / 2 - 16;
+    function rad(rel) { return Rp * (Math.max(rel, -40) + 40) / 40; }
+    ctx.lineWidth = 1; ctx.strokeStyle = T.line; ctx.font = '10px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    [0, -10, -20, -30].forEach(function (r) { ctx.beginPath(); ctx.arc(cx, cy, rad(r), 0, 6.2832); ctx.stroke(); if (r < 0) { ctx.fillStyle = T.muted; ctx.fillText(String(r), cx + 8, cy - rad(r) + 1); } });
+    for (var t = 0; t < 360; t += 45) { ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Rp * Math.sin(t * D2R), cy - Rp * Math.cos(t * D2R)); ctx.stroke(); }
+    function curve(phi, dash, color) {
+      var pts = E.cutCurve(a, phi); ctx.beginPath();
+      pts.forEach(function (p, i) { var r = rad(p.rel), x = cx + r * Math.sin(p.th * D2R), y = cy - r * Math.cos(p.th * D2R); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
+      ctx.closePath(); ctx.setLineDash(dash); ctx.lineWidth = 2; ctx.strokeStyle = color; ctx.stroke(); ctx.setLineDash([]);
+    }
+    curve(90, [5, 3], a.color); curve(0, [], a.color);
+    ctx.fillStyle = T.ink; ctx.font = '600 11px sans-serif'; ctx.fillText('boresight', cx, cy - Rp - 6);
+  }
+
+/* ---------- Pass simulator ---------- */
+  var PM = null, lastFrame = 0;
+  function fmtT(sec, signed) {
+    var neg = sec < 0, a = Math.abs(sec), m = Math.floor(a / 60), s = Math.round(a - m * 60);
+    if (s === 60) { m++; s = 0; }
+    return (signed ? (neg ? '−' : '+') : (neg ? '−' : '')) + m + ':' + (s < 10 ? '0' : '') + s;
+  }
+  function fmtK(hz, dec) { return (hz >= 0 ? '+' : '−') + (Math.abs(hz) / 1000).toFixed(dec == null ? 1 : dec) + ' kHz'; }
+  function fmtBytes(kb) { return kb >= 1000 ? (kb / 1000).toFixed(2) + ' MB' : kb.toFixed(0) + ' kB'; }
+  function fmtKm(v) { return Math.round(v).toLocaleString('en-US') + ' km'; }
+  function curPass() { return E.passSample(S, R, PM.g, clamp(V.ps, -1, 1) * PM.g.sh); }
+  function stateOf(c) {
+    var L = S.link;
+    if (c.state === 4) return { cls: 'ok', head: 'Link closes', why: 'Spare margin ' + sgn(c.slack) + ' dB on the weakest required link, served by ' + esc(S.ants[c.k].name) + ' (' + (c.k + 1) + ').' };
+    if (c.state === 1) return { cls: 'no', head: 'No link: below the minimum elevation', why: 'The satellite is at ' + c.el.toFixed(1) + '°, under your ' + L.mask + '° mask. It is above the horizon but not used.' };
+    if (c.state === 2) return { cls: 'no', head: 'No link: no antenna covers this direction', why: 'No enabled ground antenna points here. Add or re-aim one.' };
+    var dnShort = c.sdn < 0 && L.need !== 'up', upShort = c.sup < 0 && L.need !== 'down';
+    return { cls: 'no', head: 'No link: short of the required margin', why: 'Best antenna is ' + esc(S.ants[c.k].name) + ' (' + (c.k + 1) + '). ' + (dnShort ? 'Downlink is ' + Math.abs(c.sdn).toFixed(1) + ' dB short. ' : '') + (upShort ? 'Uplink is ' + Math.abs(c.sup).toFixed(1) + ' dB short.' : '') };
+  }
+  function row(l, v, cls) { return '<dt>' + l + '</dt><dd' + (cls ? ' class="' + cls + '"' : '') + '>' + v + '</dd>'; }
+  function renderPass() {
+    if (V.mainTab !== 'pass' || !PM) return;
+    var g = PM.g, L = S.link, c = curPass(), sl = $('pSlider');
+    if (document.activeElement !== sl) sl.value = Math.round(clamp(V.ps, -1, 1) * 1000);
+    $('pPlay').textContent = V.play ? 'Pause' : 'Play';
+    $('passSub').textContent = L.altKm + ' km circular orbit · peak ' + L.passEl + '° · ' + (g.period / 60).toFixed(1) + ' min period';
+    $('pTime').innerHTML = '<span>' + fmtT(c.t, true) + ' from closest approach</span><span>' + fmtT(c.t + g.sh / g.om) + ' since rise</span><span>' + (PM.exists ? 'usable ' + fmtT(-g.sm / g.om, true) + ' to ' + fmtT(g.sm / g.om, true) : 'never above the mask') + '</span>';
+    var st = stateOf(c), ie = c.ie, B = R.B;
+    $('pBanner').className = 'banner ' + st.cls; $('pBanner').innerHTML = '<b>' + st.head + '</b><span>' + st.why + '</span>';
+    var h = row('Elevation, azimuth', c.el.toFixed(1) + '°, ' + c.az.toFixed(0) + '°') +
+      row('Slant range', fmtKm(c.rho)) + row('Ground distance from station', fmtKm(c.lam * E.RE)) +
+      row('Angle off satellite nadir', E.etaOfElev(Math.max(0, c.el), L.altKm).toFixed(1) + '°') +
+      row('Radial speed', (c.rr >= 0 ? '+' : '−') + Math.abs(c.rr).toFixed(2) + ' km/s ' + (c.rr >= 0 ? '(receding)' : '(approaching)')) +
+      '<dt class="sec">Doppler</dt>' +
+      row('Downlink as received', (L.fDn + c.dDn / 1e6).toFixed(4) + ' MHz') + row('Downlink shift', fmtK(c.dDn)) +
+      row('Uplink as it arrives at the satellite', fmtK(c.dUp)) +
+      row('Ground Tx correction to hit ' + L.fUp + ' MHz', fmtK(-c.dUp)) +
+      row('Downlink shift rate', (c.rate >= 0 ? '+' : '−') + Math.abs(c.rate).toFixed(0) + ' Hz/s') +
+      row('Shift against signal bandwidth', (Math.abs(c.dDn) / E.occBw(L, L.rateDn)).toFixed(2) + 'x') +
+      '<dt class="sec">Link at this position</dt>';
+    var fd = E.fsplDb(L.fDn, c.rho), fu = E.fsplDb(L.fUp, c.rho);
+    h += row('Path loss down / up (free space)', fd.toFixed(1) + ' / ' + fu.toFixed(1) + ' dB') +
+      row('Atmosphere, rain, other', (B.atm[ie] + L.rain + L.misc).toFixed(1) + ' dB') +
+      row('Satellite antenna gain toward station', R.satCur[ie].toFixed(1) + ' dBi');
+    if (c.k >= 0) {
+      h += row('Serving ground antenna', esc(S.ants[c.k].name) + ' (' + (c.k + 1) + ')') + row('Its net gain toward the satellite', c.gain.toFixed(1) + ' dBi') +
+        row('Downlink margin over target', sgn(c.sdn) + ' dB', c.sdn >= 0 ? 'pass' : 'fail') + row('Uplink margin over target', sgn(c.sup) + ' dB', c.sup >= 0 ? 'pass' : 'fail') +
+        row('Satellite Tx needed here', fmtW(p10(B.psat - c.sdn))) + row('Ground PA output needed here', fmtW(p10(R.cPout[c.i] - c.sup)));
+    } else h += row('Serving ground antenna', 'none');
+    $('pStats').innerHTML = h;
+    drawGeo(c); drawPassSky(c); drawPassCharts(c); renderPassSummary();
+  }
+  function renderPassSummary() {
+    var s = PM.stats, L = S.link, items;
+    if (!PM.exists) { $('pSummary').innerHTML = '<div><dt>Result</dt><dd>Satellite never usable</dd></div>'; $('pNote').textContent = ''; return; }
+    items = [
+      ['Peak elevation', s.maxEl.toFixed(0) + '°'], ['Horizon to horizon', fmtT(s.tHorizon)], ['Above the minimum elevation', fmtT(s.tAbove)],
+      ['Link closed', fmtT(s.tClosed) + ' (' + (s.fracClosed * 100).toFixed(0) + '%)'], ['Coverage gaps during the pass', String(s.gaps)], ['Antenna hand-overs', String(s.handovers)],
+      ['Downlink data per pass', fmtBytes(s.kbDn)], ['Uplink data per pass', fmtBytes(s.kbUp)],
+      ['Largest Doppler shift', '±' + (s.maxDop / 1000).toFixed(1) + ' kHz'], ['Largest shift rate', Math.round(s.maxRate) + ' Hz/s'],
+      ['Orbit period', (s.period / 60).toFixed(1) + ' min'], ['Orbit speed', s.speed.toFixed(2) + ' km/s']
+    ];
+    $('pSummary').innerHTML = items.map(function (x) { return '<div><dt>' + x[0] + '</dt><dd>' + x[1] + '</dd></div>'; }).join('');
+    $('pNote').textContent = 'Model: circular orbit, spherical Earth, straight great-circle track, information bits counted at the data rate while the link closes. Earth rotation, which shifts the Doppler by a few percent, is ignored. Ground antennas are treated as fixed, so the Doppler must be tracked in software.';
+  }
+  function drawGeo(c) {
+    var wrap = $('geoWrap'), cv = $('geo'), css = Math.round(wrap.clientWidth);
+    if (css < 60) return;
+    var L = S.link, g = PM.g, RE = E.RE, T = theme(), h = L.altKm;
+    var W = g.lamH * RE * 1.05, yTop = Math.max(h * 1.4, 260), yBot = -RE * (1 - Math.cos(W / RE)) - 70, k = css / (2 * W);
+    var H = Math.round(Math.max(230, (yTop - yBot) * k)), oy = yTop * k + (H - (yTop - yBot) * k) / 2;
+    wrap.style.height = H + 'px';
+    var ctx = setupCanvas(cv, css, H), ox = css / 2;
+    function sx(x) { return ox + x * k; } function sy(y) { return oy - y * k; }
+    var ok = c.state === 4, col = ok ? T.pass : T.fail;
+    // ground
+    ctx.beginPath(); var A = W / RE * 1.02, a;
+    for (a = -A; a <= A + 1e-9; a += A / 40) { var px = RE * Math.sin(a), py = RE * Math.cos(a) - RE; if (a === -A) ctx.moveTo(sx(px), sy(py)); else ctx.lineTo(sx(px), sy(py)); }
+    ctx.lineTo(css, H); ctx.lineTo(0, H); ctx.closePath(); ctx.fillStyle = T.surface; ctx.fill();
+    ctx.beginPath(); for (a = -A; a <= A + 1e-9; a += A / 40) { var qx = RE * Math.sin(a), qy = RE * Math.cos(a) - RE; if (a === -A) ctx.moveTo(sx(qx), sy(qy)); else ctx.lineTo(sx(qx), sy(qy)); }
+    ctx.lineWidth = 2; ctx.strokeStyle = T.muted; ctx.stroke();
+    // orbit
+    ctx.beginPath(); var Ao = W / g.r * 1.1; for (a = -Ao; a <= Ao + 1e-9; a += Ao / 40) { var ox2 = g.r * Math.sin(a), oy2 = g.r * Math.cos(a) - RE; if (a === -Ao) ctx.moveTo(sx(ox2), sy(oy2)); else ctx.lineTo(sx(ox2), sy(oy2)); }
+    ctx.setLineDash([6, 5]); ctx.lineWidth = 1.2; ctx.strokeStyle = T.muted; ctx.stroke(); ctx.setLineDash([]);
+    ctx.font = '12px sans-serif'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+    halo(ctx, 'orbit, ' + h + ' km up', 8, sy(h) - 2 + 0, T, T.muted);
+    // horizon and mask wedges
+    var m = L.mask * D2R, Lm = W / Math.cos(m);
+    [1, -1].forEach(function (sg) {
+      ctx.beginPath(); ctx.moveTo(sx(0), sy(0)); ctx.lineTo(sx(sg * W), sy(0)); ctx.lineTo(sx(sg * W), sy(W * Math.tan(m))); ctx.closePath();
+      ctx.fillStyle = T.fail; ctx.globalAlpha = 0.09; ctx.fill(); ctx.globalAlpha = 1;
+      ctx.beginPath(); ctx.moveTo(sx(0), sy(0)); ctx.lineTo(sx(sg * Lm * Math.cos(m)), sy(Lm * Math.sin(m))); ctx.setLineDash([4, 4]); ctx.lineWidth = 1; ctx.strokeStyle = T.fail; ctx.stroke(); ctx.setLineDash([]);
+    });
+    ctx.beginPath(); ctx.moveTo(sx(-W), sy(0)); ctx.lineTo(sx(W), sy(0)); ctx.setLineDash([2, 4]); ctx.lineWidth = 1; ctx.strokeStyle = T.muted; ctx.stroke(); ctx.setLineDash([]);
+    ctx.textAlign = 'right'; halo(ctx, 'mask ' + L.mask + '°', css - 8, sy(W * Math.tan(m)) + 12, T, T.fail); ctx.textAlign = 'left';
+    // satellite
+    var sg2 = c.s >= 0 ? 1 : -1, xs = sg2 * g.r * Math.sin(c.lam), ys = g.r * Math.cos(c.lam) - RE, xn = sg2 * RE * Math.sin(c.lam), yn = RE * Math.cos(c.lam) - RE;
+    ctx.beginPath(); ctx.moveTo(sx(xs), sy(ys)); ctx.lineTo(sx(xn), sy(yn)); ctx.setLineDash([2, 3]); ctx.lineWidth = 1; ctx.strokeStyle = T.muted; ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); for (a = 0; a <= c.lam + 1e-9; a += Math.max(c.lam / 30, 1e-4)) { var gx = sg2 * RE * Math.sin(a), gy = RE * Math.cos(a) - RE; if (a === 0) ctx.moveTo(sx(gx), sy(gy)); else ctx.lineTo(sx(gx), sy(gy)); }
+    ctx.lineWidth = 3.5; ctx.strokeStyle = T.accent; ctx.stroke();
+    ctx.textAlign = 'center'; halo(ctx, fmtKm(c.lam * RE) + ' along the ground', sx(xn / 2 + sg2 * 60 / k), sy(yn / 2) + 34, T, T.accent);
+    // line of sight
+    ctx.beginPath(); ctx.moveTo(sx(0), sy(0)); ctx.lineTo(sx(xs), sy(ys)); ctx.setLineDash(ok ? [] : [7, 5]); ctx.lineWidth = 2.5; ctx.strokeStyle = col; ctx.stroke(); ctx.setLineDash([]);
+    var mx = sx(xs / 2), my = sy(ys / 2);
+    halo(ctx, fmtKm(c.rho), mx + (sg2 > 0 ? -6 : 6), my - 12, T, T.ink);
+    // elevation arc
+    var e = Math.max(0, c.el) * D2R;
+    ctx.beginPath(); if (sg2 > 0) ctx.arc(sx(0), sy(0), 38, -e, 0); else ctx.arc(sx(0), sy(0), 38, e - Math.PI, -Math.PI, true);
+    ctx.lineWidth = 2; ctx.strokeStyle = T.ink; ctx.stroke();
+    ctx.textAlign = sg2 > 0 ? 'left' : 'right'; halo(ctx, 'el ' + c.el.toFixed(0) + '°', sx(0) + sg2 * 46, sy(0) - 10, T, T.ink);
+    // station and satellite glyphs
+    ctx.beginPath(); ctx.moveTo(sx(0), sy(0) - 12); ctx.lineTo(sx(0) - 8, sy(0)); ctx.lineTo(sx(0) + 8, sy(0)); ctx.closePath(); ctx.fillStyle = T.ink; ctx.fill();
+    ctx.textAlign = 'center'; halo(ctx, 'Station', sx(0), sy(0) + 16, T, T.ink);
+    var X = sx(xs), Y = sy(ys);
+    ctx.fillStyle = T.ink; ctx.fillRect(X - 17, Y - 3, 11, 6); ctx.fillRect(X + 6, Y - 3, 11, 6);
+    ctx.beginPath(); ctx.rect(X - 5, Y - 6, 10, 12); ctx.fillStyle = col; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = T.ink; ctx.stroke();
+    ctx.textAlign = 'center'; halo(ctx, 'Satellite', X, Y - 17, T, T.ink);
+  }
+  function drawPassSky(c) {
+    var cv = $('pSky'), css = Math.round(cv.parentElement.clientWidth);
+    if (css < 60) return;
+    var T = theme(), ctx = setupCanvas(cv, css, css), L = S.link, Rr = css / 2 - 26, cx = css / 2, cy = css / 2, key = css + '|' + T.bg + '|' + T.mid;
+    if (!R._pb || R._pb.key !== key) {
+      var oc = document.createElement('canvas'); oc.width = css; oc.height = css;
+      var ox = oc.getContext('2d'), img = ox.createImageData(css, css), d = img.data, bg = T.bgRGB, mid = hex2rgb(T.mid), cols = S.ants.map(function (a) { return hex2rgb(a.color); });
+      for (var py = 0; py < css; py++) for (var px = 0; px < css; px++) {
+        var dx = px + 0.5 - cx, dy = cy - (py + 0.5), r = Math.sqrt(dx * dx + dy * dy);
+        if (r > Rr) continue;
+        var el = 90 * (1 - r / Rr), az = Math.atan2(dx, dy) * R2D; if (az < 0) az += 360;
+        var ci = cellIndex(az, el), kk = R.idx[ci], good = kk >= 0 && R.slackBest[ci] >= 0;
+        var col = good ? blend(cols[kk], bg, 0.5) : blend(mid, bg, 0.45);
+        if (el < L.mask) col = blend(col, bg, 0.6);
+        var o = (py * css + px) * 4; d[o] = col[0]; d[o + 1] = col[1]; d[o + 2] = col[2]; d[o + 3] = 255;
+      }
+      ox.putImageData(img, 0, 0); R._pb = { key: key, cv: oc };
+    }
+    ctx.drawImage(R._pb.cv, 0, 0, css, css);
+    function P(az, el) { var a = az * D2R, r = Rr * (1 - el / 90); return [cx + r * Math.sin(a), cy - r * Math.cos(a)]; }
+    ctx.lineWidth = 1; ctx.strokeStyle = T.ink; ctx.globalAlpha = 0.25;
+    [30, 60].forEach(function (e) { ctx.beginPath(); ctx.arc(cx, cy, Rr * (1 - e / 90), 0, 6.2832); ctx.stroke(); });
+    for (var a = 0; a < 360; a += 90) { var p = P(a, 0); ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(p[0], p[1]); ctx.stroke(); }
+    ctx.globalAlpha = 0.8; ctx.strokeStyle = T.muted; ctx.beginPath(); ctx.arc(cx, cy, Rr, 0, 6.2832); ctx.stroke();
+    ctx.globalAlpha = 0.9; ctx.setLineDash([4, 3]); ctx.strokeStyle = T.ink; ctx.beginPath(); ctx.arc(cx, cy, Rr * (1 - L.mask / 90), 0, 6.2832); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+    ctx.font = '600 13px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    [[0, 'N'], [90, 'E'], [180, 'S'], [270, 'W']].forEach(function (q) { var pp = P(q[0], -9); ctx.fillStyle = T.ink; ctx.fillText(q[1], pp[0], pp[1]); });
+    var sm = PM.smp;
+    function seg(j, w) {
+      var p1 = P(sm[j].az, sm[j].el), p2 = P(sm[j + 1].az, sm[j + 1].el);
+      ctx.beginPath(); ctx.moveTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]); ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.stroke();
+    }
+    var j;
+    ctx.strokeStyle = T.bg; ctx.globalAlpha = 0.85; for (j = 0; j < sm.length - 1; j++) seg(j, 7); ctx.globalAlpha = 1;
+    for (j = 0; j < sm.length - 1; j++) {
+      var q = sm[j];
+      ctx.strokeStyle = q.state === 4 ? S.ants[q.k].color : q.state === 1 ? T.muted : T.fail;
+      seg(j, q.state === 4 ? 4 : 2);
+    }
+    var first = -1, last = -1; sm.forEach(function (q, i) { if (q.aboveMask) { if (first < 0) first = i; last = i; } });
+    ctx.font = '12px sans-serif';
+    if (first >= 0) { var pr = P(sm[first].az, sm[first].el), ps = P(sm[last].az, sm[last].el); halo(ctx, 'rise', pr[0], pr[1] - 12, T, T.ink); halo(ctx, 'set', ps[0], ps[1] - 12, T, T.ink); }
+    var pc = P(c.az, Math.max(0, c.el)); ctx.beginPath(); ctx.arc(pc[0], pc[1], 9, 0, 6.2832); ctx.fillStyle = c.state === 4 ? T.pass : T.fail; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = T.ink; ctx.stroke();
+  }
+  function timeChart(cv, cfg, c) {
+    var A = axisSetup(cv, cfg.strip ? 52 : 34, cfg.right ? 40 : 12); if (!A) return;
+    var ctx = A.ctx, T = A.T, pad = A.pad, pw = A.pw, ph = A.ph, sm = PM.smp, t0 = sm[0].t, t1 = sm[sm.length - 1].t, i;
+    function X(t) { return pad.l + pw * (t - t0) / (t1 - t0); }
+    function Y(v) { return pad.t + ph * (1 - (clamp(v, cfg.lo, cfg.hi) - cfg.lo) / (cfg.hi - cfg.lo)); }
+    gridY(A, cfg.lo, cfg.hi, cfg.step, cfg.title);
+    ctx.fillStyle = T.muted; ctx.globalAlpha = 0.16;
+    var st = -1; for (i = 0; i <= sm.length; i++) {
+      var below = i < sm.length && !sm[i].aboveMask;
+      if (below && st < 0) st = i;
+      if (!below && st >= 0) { ctx.fillRect(X(sm[st].t), pad.t, X(sm[i - 1].t) - X(sm[st].t) + 1, ph); st = -1; }
+    }
+    ctx.globalAlpha = 1;
+    var step = (t1 - t0) > 600 ? 120 : 60; ctx.font = '12px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillStyle = T.muted;
+    for (var tt = Math.ceil(t0 / step) * step; tt <= t1; tt += step) {
+      ctx.strokeStyle = T.line; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X(tt), pad.t); ctx.lineTo(X(tt), pad.t + ph); ctx.stroke();
+      ctx.fillText(fmtT(tt, true), X(tt), pad.t + ph + (cfg.strip ? 18 : 6));
+    }
+    if (cfg.zero) { ctx.beginPath(); ctx.moveTo(pad.l, Y(0)); ctx.lineTo(A.W - pad.r, Y(0)); ctx.lineWidth = 1.6; ctx.strokeStyle = T.ink; ctx.stroke(); }
+    if (cfg.right) {
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillStyle = T.muted;
+      [0, 30, 60, 90].forEach(function (e) { ctx.fillText(e + '°', A.W - pad.r + 6, Y(cfg.lo + e / 90 * (cfg.hi - cfg.lo))); });
+    }
+    cfg.series.forEach(function (s) {
+      ctx.beginPath(); var pen = false;
+      for (i = 0; i < sm.length; i++) {
+        var v = s.fn(sm[i]);
+        if (v == null) { pen = false; continue; }
+        if (pen) ctx.lineTo(X(sm[i].t), Y(v)); else { ctx.moveTo(X(sm[i].t), Y(v)); pen = true; }
+      }
+      ctx.setLineDash(s.dash || []); ctx.lineWidth = s.w || 2.4; ctx.strokeStyle = s.color; ctx.lineJoin = 'round'; ctx.stroke(); ctx.setLineDash([]);
+    });
+    if (cfg.strip) {
+      var y0 = pad.t + ph + 4, bw = pw / (sm.length - 1) + 0.6;
+      for (i = 0; i < sm.length; i++) {
+        var q = sm[i]; ctx.fillStyle = q.state === 4 ? S.ants[q.k].color : q.state === 1 ? T.mid : T.fail;
+        ctx.fillRect(X(q.t) - bw / 2, y0, bw, 9);
+      }
+    }
+    ctx.beginPath(); ctx.moveTo(X(c.t), pad.t); ctx.lineTo(X(c.t), pad.t + ph + (cfg.strip ? 13 : 0)); ctx.lineWidth = 1.6; ctx.strokeStyle = T.ink; ctx.stroke();
+    cfg.series.forEach(function (s) {
+      if (!s.dot) return; var v = s.fn(c); if (v == null) return;
+      ctx.beginPath(); ctx.arc(X(c.t), Y(v), 5, 0, 6.2832); ctx.fillStyle = s.color; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = T.bg; ctx.stroke();
+    });
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillStyle = T.muted; ctx.fillText('Time from closest approach, minutes:seconds', pad.l + pw / 2, A.H - 16);
+  }
+  function chip(color, label, dash) { return '<span><i' + (dash ? ' class="d"' : '') + ' style="border-color:' + color + '"></i>' + label + '</span>'; }
+  function drawPassCharts(c) {
+    var T = theme(), L = S.link, rd = L.need !== 'up', ru = L.need !== 'down', sm = PM.smp, i;
+    var mn = -5, mx = 5;
+    sm.forEach(function (q) { if (q.aboveMask && q.k >= 0) { if (rd) { mn = Math.min(mn, q.sdn); mx = Math.max(mx, q.sdn); } if (ru) { mn = Math.min(mn, q.sup); mx = Math.max(mx, q.sup); } } });
+    var lo = clamp(Math.floor((mn - 1) / 10) * 10, -50, -10), hi = clamp(Math.ceil((mx + 1) / 10) * 10, 10, 60);
+    var ms = [];
+    if (rd) ms.push({ fn: function (q) { return q.k >= 0 ? q.sdn : null; }, color: T.dn, dot: true });
+    if (ru) ms.push({ fn: function (q) { return q.k >= 0 ? q.sup : null; }, color: T.up, dot: true });
+    timeChart($('pMargin'), { series: ms, lo: lo, hi: hi, step: hi - lo > 60 ? 20 : 10, title: 'Margin over target, dB', zero: true, strip: true }, c);
+    $('pMarginLeg').innerHTML = (rd ? chip(T.dn, 'Downlink') : '') + (ru ? chip(T.up, 'Uplink') : '') + '<span><i style="border-color:' + T.ink + '"></i>Zero: required margin</span>' +
+      S.ants.map(function (a, k) { return '<span><i style="border-width:5px;border-color:' + a.color + ';width:12px"></i>' + (k + 1) + '</span>'; }).join('') + '<span><i style="border-width:5px;border-color:' + T.fail + ';width:12px"></i>Short</span><span><i style="border-width:5px;border-color:' + T.mid + ';width:12px"></i>Under the mask</span>';
+    var md = 5; sm.forEach(function (q) { md = Math.max(md, Math.abs(q.dDn) / 1000, Math.abs(q.dUp) / 1000); });
+    var dh = Math.ceil(md / 10) * 10;
+    timeChart($('pDop'), { series: [{ fn: function (q) { return q.dDn / 1000; }, color: T.dn, dot: true }, { fn: function (q) { return q.dUp / 1000; }, color: T.up, dot: true, dash: [6, 4] }], lo: -dh, hi: dh, step: dh > 40 ? 20 : 10, title: 'Doppler shift, kHz', zero: true }, c);
+    $('pDopLeg').innerHTML = chip(T.dn, 'Downlink, ' + L.fDn + ' MHz') + chip(T.up, 'Uplink at the satellite, ' + L.fUp + ' MHz', true) + '<span>Positive means the satellite is approaching.</span>';
+    var mr = 0; sm.forEach(function (q) { mr = Math.max(mr, q.rho); });
+    var rh = Math.ceil(mr / 500) * 500, rs = rh > 3000 ? 1000 : 500;
+    timeChart($('pRange'), { series: [{ fn: function (q) { return q.rho; }, color: T.ink, dot: true }, { fn: function (q) { return q.el / 90 * rh; }, color: T.accent, dash: [6, 4], dot: true }], lo: 0, hi: rh, step: rs, title: 'Slant range, km', right: true }, c);
+    $('pRangeLeg').innerHTML = chip(T.ink, 'Range (left axis)') + chip(T.accent, 'Elevation (right axis)', true) + '<span>Grey bands are under the minimum elevation.</span>';
+  }
+  function bindPass() {
+    var f = $('pFields'); f.innerHTML = '';
+    f.appendChild(lf('passEl', { slider: true, dec: 0 })); f.appendChild(lf('az0', { dec: 0 }));
+    var sl = $('pSlider');
+    sl.addEventListener('input', function () { V.play = false; V.ps = sl.value / 1000; renderPass(); });
+    function go(v) { V.play = false; V.ps = v; renderPass(); }
+    $('pMax').addEventListener('click', function () { go(0); });
+    $('pAos').addEventListener('click', function () { go(PM && PM.exists ? -PM.g.sm / PM.g.sh : -1); });
+    $('pLos').addEventListener('click', function () { go(PM && PM.exists ? PM.g.sm / PM.g.sh : 1); });
+    $('pPlay').addEventListener('click', function () {
+      V.play = !V.play;
+      if (V.play) { if (V.ps >= 0.999) V.ps = -1; lastFrame = 0; requestAnimationFrame(tick); }
+      renderPass();
+    });
+    $('pChain').addEventListener('click', function () { var c = curPass(); V.dir = { az: c.az, el: Math.max(0, c.el) }; setTab('chain'); });
+  }
+  function tick(ts) {
+    if (!V.play || V.mainTab !== 'pass' || !PM) { V.play = false; return; }
+    var dt = lastFrame ? Math.min(0.1, (ts - lastFrame) / 1000) : 0; lastFrame = ts;
+    V.ps += dt * (+$('pSpeed').value) * PM.g.om / PM.g.sh;
+    if (V.ps > 1) V.ps = -1;
+    renderPass(); requestAnimationFrame(tick);
+  }
+  function setTab(name) {
+    V.mainTab = name; if (name !== 'pass') V.play = false;
+    document.querySelectorAll('#mainTabs button').forEach(function (b) { b.setAttribute('aria-selected', b.dataset.tab === name ? 'true' : 'false'); });
+    ['cov', 'pass', 'chain', 'margin', 'sat'].forEach(function (n) { $('p-' + n).hidden = n !== name; });
+    changed();
+  }
+
+
+
+  /* ---------- Save and load a setup as a JSON file ---------- */
+  var setupTimer;
+  function setupMsg(t, err) {
+    var m = $('setupMsg'); m.textContent = t; m.className = 'sMsg' + (err ? ' err' : ''); m.hidden = !t;
+    clearTimeout(setupTimer); if (t) setupTimer = setTimeout(function () { m.hidden = true; }, err ? 8000 : 5000);
+  }
+  function exportSetup() {
+    var data = { app: 'rf-link', version: 1, exported: new Date().toISOString(), link: S.link, ants: S.ants };
+    var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }), url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = url; a.download = 'rf-link-setup-' + new Date().toISOString().slice(0, 10) + '.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    setupMsg('Saved ' + S.ants.length + ' antennas and the link scenario to ' + a.download + '.');
+  }
+  function importSetup(file) {
+    if (!file) return;
+    if (file.size > 200 * 1024) { setupMsg('That file is too large to be an RF-Link setup (limit 200 KB).', true); return; }
+    var fr = new FileReader();
+    fr.onerror = function () { setupMsg('Could not read that file.', true); };
+    fr.onload = function () {
+      var j;
+      try { j = JSON.parse(fr.result); } catch (e) { setupMsg('That file is not valid JSON.', true); return; }
+      if (!j || j.app !== 'rf-link') { setupMsg('That file is not an RF-Link setup.', true); return; }
+      var st = sanitizeState(j);
+      if (!st) { setupMsg('That setup file is missing its link scenario or antennas.', true); return; }
+      S.link = st.link; S.ants = st.ants; S.nextId = st.nextId;
+      V.solo = null; V.dir = null; selId = S.ants.length ? S.ants[0].id : null;
+      buildLeft(); buildEditor(); changed();
+      setupMsg('Loaded ' + file.name + ': ' + S.ants.length + ' antenna' + (S.ants.length === 1 ? '' : 's') + '.' + (st.adj ? ' Some values were adjusted to the allowed limits.' : '') + (typeof j.version === 'number' && j.version > 1 ? ' Saved by a newer version, so some settings may be ignored.' : ''));
+    };
+    fr.readAsText(file);
+  }
+  function setupIsDefault() {
+    var d = E.defaultState();
+    return JSON.stringify({ link: S.link, ants: S.ants }) === JSON.stringify({ link: d.link, ants: d.ants });
+  }
+  function bindSetup() {
+    var btn = $('loadSetup'), inp = $('setupFile'), t, armed = false;
+    function disarm() { armed = false; btn.textContent = 'Load setup'; clearTimeout(t); }
+    // Ask first only when loading would discard work; returns true when it is fine to proceed.
+    function okToReplace() {
+      if (setupIsDefault() || armed) { disarm(); return true; }
+      armed = true; btn.textContent = 'Click again to confirm'; t = setTimeout(disarm, 3000); return false;
+    }
+    $('saveSetup').addEventListener('click', exportSetup);
+    btn.addEventListener('click', function () { if (okToReplace()) inp.click(); });
+    inp.addEventListener('change', function () { var f = inp.files && inp.files[0]; inp.value = ''; importSetup(f); });
+    var pane = document.querySelector('#rf .paneL');
+    ['dragenter', 'dragover'].forEach(function (n) { pane.addEventListener(n, function (e) { if (e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types || [], 'Files') >= 0) { e.preventDefault(); pane.classList.add('drop'); } }); });
+    pane.addEventListener('dragleave', function (e) { if (e.target === pane) pane.classList.remove('drop'); });
+    pane.addEventListener('drop', function (e) {
+      pane.classList.remove('drop');
+      var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (!f) return;
+      e.preventDefault();
+      if (!setupIsDefault() && !window.confirm('Loading ' + f.name + ' will replace your current setup. Continue?')) return;
+      importSetup(f);
+    });
+  }
+
+  /* ---------- Orchestration ---------- */
+  function drawViz() { if (V.tab === 'sky') drawSky(); else drawDome(); }
+  function update() {
+    R = E.compute(S); R._c = {}; PM = E.passModel(S, R);
+    if (V.solo != null && (antIndex(V.solo) < 0)) V.solo = null;
+    renderChips(); renderDerived(); renderList(); renderResults(); renderEditorNote(); renderLegend(); renderChain();
+    drawViz(); drawChart(); drawSatChart(); renderPass(); drawCut(); save();
+  }
+  function bindStatic() {
+    var sel = $('layer');
+    [['gain', 'Best gain (dBi)'], ['serve', 'Serving antenna'], ['count', 'Antennas that close the link'], ['sdn', 'Downlink margin over target'], ['sup', 'Uplink margin over target'], ['reqSat', 'Satellite Tx power needed'], ['reqPA', 'Ground PA output needed']]
+      .forEach(function (o) { var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; sel.appendChild(op); });
+    sel.value = V.layer;
+    sel.addEventListener('change', function () { V.layer = sel.value; changed(); });
+    function tab(name) {
+      V.tab = name;
+      $('tabSky').setAttribute('aria-selected', name === 'sky'); $('tabDome').setAttribute('aria-selected', name === 'dome');
+      $('sky').hidden = name !== 'sky'; $('dome').hidden = name !== 'dome';
+      $('probe').textContent = name === 'sky' ? PROBE_HINT : 'Drag to rotate the dome. Each antenna is drawn as a small model on its boresight, numbered to match the list. Dashed outlines show the -3 dB beams.';
+      changed();
+    }
+    $('tabSky').addEventListener('click', function () { tab('sky'); });
+    $('tabDome').addEventListener('click', function () { tab('dome'); });
+    [['tgOutline', 'outlines'], ['tgBeam', 'beams'], ['tgBore', 'bores'], ['tgHatch', 'hatch'], ['tgModels', 'models']].forEach(function (p) {
+      $(p[0]).addEventListener('change', function () { V[p[1]] = $(p[0]).checked; changed(); });
+    });
+    $('resetLink').addEventListener('click', function () { S.link = E.defaultLink(); linkReg.forEach(function (f) { f(); }); changed(); });
+    $('probe').textContent = PROBE_HINT;
+    document.querySelectorAll('#mainTabs button').forEach(function (b) { b.addEventListener('click', function () { setTab(b.dataset.tab); }); });
+    $('chainWorst').addEventListener('click', function () { V.dir = null; changed(); });
+  }
+  function init() {
+    buildLeft(); bindPass(); bindStatic(); bindSetup(); bindAntTools(); bindSky(); bindDome(); buildEditor();
+    update();
+    if (window.ResizeObserver) {
+      var ro = new ResizeObserver(function () { changed(); });
+      ro.observe($('sky').parentElement); ro.observe($('chart').parentElement); ro.observe($('satChart').parentElement); ['geoWrap', 'pMargin', 'pDop', 'pRange', 'pSky'].forEach(function (id) { ro.observe($(id).parentElement); });
+    } else window.addEventListener('resize', changed);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { changed(); });
+  }
+  init();
+})();
+</script>
+<script data-goatcounter="https://thanospapad.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
