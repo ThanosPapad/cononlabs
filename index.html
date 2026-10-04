@@ -107,11 +107,27 @@
   ═══════════════════════════════════════════ -->
   <section id="hero">
     <canvas id="starfield"></canvas>
-    <div class="hero-content">
-      <img src="assets/images/conon_logo_2.png" alt="Conon Labs" class="hero-logo" id="heroLogo" />
-      <h1 class="hero-tagline">Next-Gen Space Comms</h1>
-      <p class="hero-sub">Space &amp; terrestrial electronics · Embedded systems · Deep tech</p>
-      <a href="#about" class="hero-cta">Explore</a>
+    <div class="hero-inner">
+      <div class="hero-content">
+        <img src="assets/images/conon_logo_2.png" alt="Conon Labs" class="hero-logo" id="heroLogo" />
+        <h1 class="hero-tagline">Next-Gen Space Comms</h1>
+        <p class="hero-sub">Space &amp; terrestrial electronics · Embedded systems · Deep tech</p>
+        <a href="#about" class="hero-cta">Explore</a>
+      </div>
+      <figure class="hero-video" id="heroVideoWrap">
+        <video id="heroVideo" src="assets/video/intro_hero.mp4" poster="assets/images/intro_poster.jpg"
+               autoplay muted loop playsinline preload="metadata"
+               aria-label="Conon Labs intro video"></video>
+        <div class="hero-video-controls" id="heroVideoControls">
+          <button type="button" class="hv-btn" id="hvSound" aria-label="Play intro with sound">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9v6h4l5 4V5L7 9H3z"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <span>Play with sound</span>
+          </button>
+          <button type="button" class="hv-btn hv-icon" id="hvFull" aria-label="Fullscreen">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+      </figure>
     </div>
     <div class="hero-scroll-hint">
       <span></span>

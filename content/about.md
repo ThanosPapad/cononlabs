@@ -82,7 +82,7 @@ As the number of satellites in orbit continues to grow, communication systems mu
   }
 </style>
 <br>
-<a href="/progress/" class="progress-cta">See our progress →</a>
+<a href="/progress/" class="progress-cta">See our progress</a>
 
 <br><br><br>
 ## Our Values

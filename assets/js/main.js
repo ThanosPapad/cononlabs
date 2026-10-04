@@ -52,6 +52,72 @@ if (yearEl) yearEl.textContent = new Date().getFullYear();
   requestAnimationFrame(draw);
 })();
 
+/* ── Hero intro video ──────────────────────────────────────
+   Muted loop by default. "Play with sound" / fullscreen swap in the full
+   video (with audio) and play it from the start; when it ends, the loop returns. */
+(function initHeroVideo() {
+  const wrap  = document.getElementById('heroVideoWrap');
+  const video = document.getElementById('heroVideo');
+  if (!wrap || !video) return;
+
+  const LOOP_SRC = video.getAttribute('src');
+  const FULL_SRC = 'assets/video/intro_full.mp4';
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+  if (reduceMotion.matches) { video.removeAttribute('autoplay'); video.pause(); }
+
+  // Pause the loop while it's off-screen
+  new IntersectionObserver(([entry]) => {
+    if (wrap.classList.contains('is-full') || reduceMotion.matches) return;
+    if (entry.isIntersecting) video.play().catch(() => {});
+    else video.pause();
+  }, { threshold: 0.25 }).observe(wrap);
+
+  function playFull() {
+    wrap.classList.add('is-full');
+    video.src = FULL_SRC;
+    video.loop = false;
+    video.muted = false;
+    video.controls = true;
+    video.play().catch(() => {});
+  }
+
+  function backToLoop() {
+    wrap.classList.remove('is-full');
+    video.controls = false;
+    video.muted = true;
+    video.loop = true;
+    video.src = LOOP_SRC;
+    if (!reduceMotion.matches) video.play().catch(() => {});
+  }
+
+  function enterFullscreen() {
+    if (video.requestFullscreen) {
+      video.requestFullscreen()
+        .then(() => {
+          // Android: use the whole landscape screen for the 16:9 video
+          if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {});
+        })
+        .catch(() => {});
+    } else if (video.webkitEnterFullscreen) {
+      video.webkitEnterFullscreen(); // iPhone Safari: native player, needs metadata loaded
+    }
+  }
+
+  document.getElementById('hvSound').addEventListener('click', playFull);
+  document.getElementById('hvFull').addEventListener('click', () => {
+    playFull();
+    // Standard API works straight from the click; iPhone's webkitEnterFullscreen
+    // throws until the new source has metadata, so only that path waits.
+    if (video.requestFullscreen || video.readyState >= 1) enterFullscreen();
+    else video.addEventListener('loadedmetadata', enterFullscreen, { once: true });
+  });
+  video.addEventListener('ended', () => {
+    if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen();
+    backToLoop();
+  });
+})();
+
 /* ── Navbar scroll behaviour ────────────────────────────── */
 const navbar = document.getElementById('navbar');
 window.addEventListener('scroll', () => {
