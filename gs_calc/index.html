@@ -277,8 +277,42 @@
   .leaflet-popup-content{ font-size:9.5px; margin:9px 11px; font-family: var(--font-body); }
   .leaflet-popup-tip{ background: rgba(13,17,23,0.92); border:1px solid rgba(255,255,255,0.1); box-shadow:none; }
 
+  /* 2D / 3D view switch — top-centre of the map */
+  .view-toggle{
+    position:absolute; top:12px; left:50%; transform:translateX(-50%);
+    display:flex; z-index:1000;
+    background:rgba(13,17,23,0.92); border:1px solid rgba(255,255,255,0.1);
+  }
+  .view-toggle button{ border:none; border-radius:0; padding:7px 18px; margin:0; }
+  .view-toggle button + button{ border-left:1px solid rgba(255,255,255,0.1); }
+  .view-toggle button.on{ background:var(--accent); color:#000; }
+
+  /* 3D globe (CesiumJS, lazy-loaded) */
+  #globe{ position:absolute; inset:0; background:#0a0e14; display:none; }
+  /* Cesium credits: drop the logo image, keep the text credits (incl. © Esri) styled like Leaflet's attribution */
+  #globe .cesium-credit-logoContainer{ display:none !important; }
+  #globe .cesium-viewer-bottom{ left:auto !important; right:0; bottom:0; }
+  #globe .cesium-widget-credits{
+    padding:2px 6px;
+    background:rgba(8,8,8,0.72); font-family:var(--font-body); font-size:8px !important;
+    color:rgba(255,255,255,0.28) !important;
+  }
+  #globe .cesium-credit-textContainer, #globe .cesium-credit-text{ font-size:8px !important; color:rgba(255,255,255,0.28) !important; }
+  #globe .cesium-widget-credits a, #globe .cesium-credit-expand-link{ color:rgba(255,255,255,0.38) !important; font-size:8px !important; }
+  .globe-msg{
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    font-size:9.5px; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted);
+    z-index:5; display:none; text-align:center; line-height:1.8;
+  }
+  .globe-msg.show{ display:block; }
+  .globe-hint{
+    position:absolute; left:12px; bottom:12px; z-index:5; display:none;
+    font-size:8.5px; color:var(--muted); background:rgba(8,8,8,0.72); padding:5px 8px;
+  }
+  .globe-hint.show{ display:block; }
+
   .placing-banner{
-    position:absolute; top:16px; left:50%; transform:translateX(-50%);
+    position:absolute; top:56px; left:50%; transform:translateX(-50%);
     background: var(--accent); color:#000;
     font-family: var(--font-body);
     font-weight:500; font-size:9.5px; letter-spacing:0.1em; text-transform:uppercase;
@@ -411,11 +445,15 @@
         <div class="sb-label">Orbit Track <span class="hint">visual</span></div>
         <div class="field-flex">
           <span class="field-lbl">Ground track (1 orbit)</span>
-          <button class="btn toggle" id="trackSwitch">Off</button>
+          <button class="btn toggle on" id="trackSwitch">On</button>
         </div>
         <div class="field-flex">
           <span class="field-lbl">Live sub-satellite point</span>
-          <button class="btn toggle" id="liveSwitch">Off</button>
+          <button class="btn toggle on" id="liveSwitch">On</button>
+        </div>
+        <div class="field-flex" id="flySatRow" style="display:none;">
+          <span class="field-lbl">Globe camera</span>
+          <button class="btn" id="flySatBtn" title="Needs the live sub-satellite point turned on">Fly to satellite</button>
         </div>
       </div>
 
@@ -471,6 +509,13 @@
 
     <div class="map-wrap">
       <div id="map"></div>
+      <div id="globe"></div>
+      <div class="globe-msg" id="globeMsg">Loading 3D globe…</div>
+      <div class="globe-hint" id="globeHint">Drag to rotate · scroll to zoom · drag a station to move it</div>
+      <div class="view-toggle" id="viewToggle" role="group" aria-label="Map view">
+        <button class="on" id="view2d" type="button">2D</button>
+        <button id="view3d" type="button">3D</button>
+      </div>
       <div class="placing-banner" id="placingBanner">
         Click the map to place the ground station
         <button id="cancelPlaceBtn">Cancel</button>
@@ -517,7 +562,12 @@
     liveTimer: null,
     nextId: 1,
     pricePerMinute: 0,
-    currency: '$'
+    currency: '$',
+    view: '2d',           // '2d' | '3d'
+    globe: null,          // Cesium viewer once 3D has been opened
+    satPos: null,         // latest {lat, lon, h} of the live satellite
+    track3d: [],          // Cesium entities for the 3D orbit track
+    sat3d: null           // Cesium entity for the live satellite
   };
 
   /* ============================================================
@@ -629,6 +679,7 @@
       satInfo.textContent = `Loaded. Mean altitude ≈ ${Math.round(state.altitudeKm)} km, orbital period ≈ ${periodMin} min.`;
       refreshAllFootprints();
       if (document.getElementById('trackSwitch').classList.contains('on')) drawGroundTrack();
+      if (document.getElementById('liveSwitch').classList.contains('on')) startLiveTracking();
       return true;
     } catch(err){
       satInfo.textContent = "Could not parse that TLE. Check the two lines and try again.";
@@ -676,13 +727,17 @@
   placeBtn.addEventListener('click', () => {
     state.placing = true;
     placingBanner.classList.add('show');
-    document.getElementById('map').style.cursor = 'crosshair';
+    setPlaceCursor('crosshair');
   });
   document.getElementById('cancelPlaceBtn').addEventListener('click', stopPlacing);
   function stopPlacing(){
     state.placing = false;
     placingBanner.classList.remove('show');
-    document.getElementById('map').style.cursor = '';
+    setPlaceCursor('');
+  }
+  function setPlaceCursor(c){
+    document.getElementById('map').style.cursor = c;
+    document.getElementById('globe').style.cursor = c;
   }
 
   // Modal
@@ -736,6 +791,7 @@
   }
 
   function updateFootprint(gs){
+    syncStation3d(gs);
     if (gs.footprint){ map.removeLayer(gs.footprint); gs.footprint = null; }
     if (!state.altitudeKm) return;
     const r = footprintRadiusKm(state.altitudeKm, gs.minElevDeg);
@@ -755,6 +811,7 @@
     if (!gs) return;
     map.removeLayer(gs.marker);
     if (gs.footprint) map.removeLayer(gs.footprint);
+    remove3dStation(gs);
     state.groundStations = state.groundStations.filter(g=>g.id!==id);
     delete state.passesByStation[id];
     renderGsList();
@@ -781,7 +838,9 @@
           <button class="icon-btn focus" title="Center map">&#9678;</button>
           <button class="icon-btn remove" title="Remove">&#10005;</button>
         </div>`;
-      row.querySelector('.focus').addEventListener('click', () => map.setView([gs.lat, gs.lon], 5));
+      row.querySelector('.focus').addEventListener('click', () => {
+        if (state.view === '3d') flyToStation(gs); else map.setView([gs.lat, gs.lon], 5);
+      });
       row.querySelector('.remove').addEventListener('click', () => removeGroundStation(gs.id));
       gsListEl.appendChild(row);
     });
@@ -801,7 +860,10 @@
     const on = trackSwitch.classList.toggle('on');
     trackSwitch.textContent = on ? 'On' : 'Off';
     if (on) drawGroundTrack();
-    else if (state.trackLayer){ map.removeLayer(state.trackLayer); state.trackLayer = null; }
+    else {
+      if (state.trackLayer){ map.removeLayer(state.trackLayer); state.trackLayer = null; }
+      clear3dTrack();
+    }
   });
 
   liveSwitch.addEventListener('click', () => {
@@ -811,31 +873,39 @@
     else stopLiveTracking();
   });
 
-  function drawGroundTrack(){
-    if (!state.satrec) return;
-    if (state.trackLayer){ map.removeLayer(state.trackLayer); state.trackLayer = null; }
+  // One orbital period of sub-satellite points [{lat, lon, h}] (h in km), starting now.
+  function sampleOrbit(steps){
     const periodMin = (2*Math.PI)/state.satrec.no;
     const now = new Date();
-    const steps = 180;
-    let segments = [[]];
-    let prevLon = null;
+    const pts = [];
     for (let i=0;i<=steps;i++){
       const t = new Date(now.getTime() + (i/steps)*periodMin*60000);
       const pv = satellite.propagate(state.satrec, t);
       if (!pv.position) continue;
       const gmst = satellite.gstime(t);
       const geo = satellite.eciToGeodetic(pv.position, gmst);
-      const lat = satellite.degreesLat(geo.latitude);
-      const lon = satellite.degreesLong(geo.longitude);
-      if (prevLon !== null && Math.abs(lon - prevLon) > 180){
+      pts.push({ lat: satellite.degreesLat(geo.latitude), lon: satellite.degreesLong(geo.longitude), h: geo.height });
+    }
+    return pts;
+  }
+
+  function drawGroundTrack(){
+    if (!state.satrec) return;
+    if (state.trackLayer){ map.removeLayer(state.trackLayer); state.trackLayer = null; }
+    const pts = sampleOrbit(180);
+    let segments = [[]];
+    let prevLon = null;
+    pts.forEach(p => {
+      if (prevLon !== null && Math.abs(p.lon - prevLon) > 180){
         segments.push([]);
       }
-      segments[segments.length-1].push([lat, lon]);
-      prevLon = lon;
-    }
+      segments[segments.length-1].push([p.lat, p.lon]);
+      prevLon = p.lon;
+    });
     state.trackLayer = L.layerGroup(
       segments.filter(s=>s.length>1).map(s => L.polyline(s, { color:'#58a6ff', weight:1.6, opacity:0.65, dashArray:'2,5' }))
     ).addTo(map);
+    draw3dTrack(pts);
   }
 
   function startLiveTracking(){
@@ -857,6 +927,8 @@
       const lon = satellite.degreesLong(geo.longitude);
       state.liveMarker.setLatLng([lat, lon]);
       state.liveMarker.bindPopup(`<b>${escapeHtml(state.satName)}</b><br>${lat.toFixed(2)}°, ${lon.toFixed(2)}°<br>alt ${geo.height.toFixed(0)} km`);
+      state.satPos = { lat, lon, h: geo.height };
+      set3dSat();
     };
     tick();
     state.liveTimer = setInterval(tick, 1000);
@@ -864,7 +936,390 @@
   function stopLiveTracking(){
     if (state.liveTimer){ clearInterval(state.liveTimer); state.liveTimer = null; }
     if (state.liveMarker){ map.removeLayer(state.liveMarker); state.liveMarker = null; }
+    state.satPos = null;
+    clear3dSat();
   }
+
+  /* ============================================================
+     GLOBE (3D) — CesiumJS, lazy-loaded the first time 3D is opened
+  ============================================================ */
+  const CESIUM_BASE = 'https://cdn.jsdelivr.net/npm/cesium@1.120.0/Build/Cesium/';
+  const ESRI_DARK = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}';
+  const ORBIT_COLOR = '#58a6ff';
+
+  const mapEl = document.getElementById('map');
+  const globeEl = document.getElementById('globe');
+  const globeMsg = document.getElementById('globeMsg');
+  const globeHint = document.getElementById('globeHint');
+  const view2dBtn = document.getElementById('view2d');
+  const view3dBtn = document.getElementById('view3d');
+  const flySatRow = document.getElementById('flySatRow');
+  let cesiumPromise = null;
+
+  function loadCesium(){
+    if (window.Cesium) return Promise.resolve();
+    if (cesiumPromise) return cesiumPromise;
+    cesiumPromise = new Promise((resolve, reject) => {
+      window.CESIUM_BASE_URL = CESIUM_BASE;
+      const css = document.createElement('link');
+      css.rel = 'stylesheet';
+      css.href = CESIUM_BASE + 'Widgets/widgets.css';
+      document.head.appendChild(css);
+      const js = document.createElement('script');
+      js.src = CESIUM_BASE + 'Cesium.js';
+      js.crossOrigin = 'anonymous';
+      js.onload = resolve;
+      js.onerror = () => { cesiumPromise = null; reject(new Error('Cesium failed to load')); };
+      document.head.appendChild(js);
+    });
+    return cesiumPromise;
+  }
+
+  async function ensureGlobe(){
+    if (state.globe) return state.globe;
+    await loadCesium();
+    const C = Cesium;
+    C.Ion.defaultAccessToken = '';   // no Ion account/token — imagery comes from Esri, same as 2D
+    const viewer = new C.Viewer('globe', {
+      baseLayer: new C.ImageryLayer(new C.UrlTemplateImageryProvider({
+        url: ESRI_DARK, maximumLevel: 16, credit: '© Esri'
+      })),
+      terrainProvider: new C.EllipsoidTerrainProvider(),
+      baseLayerPicker: false, geocoder: false, homeButton: false, sceneModePicker: false,
+      navigationHelpButton: false, animation: false, timeline: false, fullscreenButton: false,
+      infoBox: false, selectionIndicator: false,
+      requestRenderMode: true, maximumRenderTimeChange: Infinity
+    });
+    const scene = viewer.scene;
+    scene.backgroundColor = C.Color.fromCssColorString('#0a0e14');
+    scene.globe.baseColor = C.Color.fromCssColorString('#10151c');
+    scene.globe.enableLighting = false;
+    scene.globe.showGroundAtmosphere = false;
+    scene.skyBox.show = false;
+    scene.sun.show = false;
+    scene.moon.show = false;
+    // Double-click would otherwise "track" the clicked entity and zoom the camera onto it.
+    viewer.cesiumWidget.screenSpaceEventHandler.removeInputAction(C.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+
+    // Start the camera over whatever the 2D map is showing.
+    const c = map.getCenter();
+    const camH = Math.min(2.5e7, Math.max(8e5, 2.2e7 / Math.pow(2, map.getZoom() - 2.4)));
+    viewer.camera.setView({ destination: C.Cartesian3.fromDegrees(c.lng, c.lat, camH) });
+
+    scene.screenSpaceCameraController.maximumZoomDistance = 4e7;   // can't drift off into empty space
+
+    // Zooming out from a tilted view slides the camera back along its view ray, which ends up aimed past
+    // the globe. Once we're far out, ease the view back toward the globe's centre so it never leaves frame.
+    scene.preRender.addEventListener(() => {
+      const cam = viewer.camera;
+      const pos = cam.positionWC;
+      if (C.Cartesian3.magnitude(pos) - 6.378e6 < 1e7) return;
+      const nadir = C.Cartesian3.normalize(C.Cartesian3.negate(pos, new C.Cartesian3()), new C.Cartesian3());
+      const dir = cam.directionWC;
+      if (C.Cartesian3.dot(dir, nadir) > 0.99995) return;
+      const nd = C.Cartesian3.normalize(C.Cartesian3.lerp(dir, nadir, 0.15, new C.Cartesian3()), new C.Cartesian3());
+      let right = C.Cartesian3.cross(nd, C.Cartesian3.UNIT_Z, new C.Cartesian3());
+      if (C.Cartesian3.magnitude(right) < 1e-6) right = C.Cartesian3.clone(C.Cartesian3.UNIT_X);
+      right = C.Cartesian3.normalize(right, right);
+      const up = C.Cartesian3.cross(right, nd, new C.Cartesian3());
+      cam.setView({ orientation: { direction: nd, up: up } });
+      scene.requestRender();   // keep animating until we're level again
+    });
+    state.globe = viewer;
+    bindGlobeInput(viewer);
+    window.addEventListener('resize', () => { viewer.resize(); viewer.scene.requestRender(); });
+    return viewer;
+  }
+
+  function globeRender(){ if (state.globe) state.globe.scene.requestRender(); }
+
+  // Pick a lat/lon on the ellipsoid under a screen position (null if the click misses the globe).
+  function pickLatLon(v, pos){
+    const C = Cesium;
+    const cart = v.camera.pickEllipsoid(pos, v.scene.globe.ellipsoid);
+    if (!cart) return null;
+    const g = C.Cartographic.fromCartesian(cart);
+    return { lat: C.Math.toDegrees(g.latitude), lon: C.Math.toDegrees(g.longitude) };
+  }
+
+  function bindGlobeInput(v){
+    const C = Cesium;
+    const handler = new C.ScreenSpaceEventHandler(v.scene.canvas);
+    let dragging = null;
+
+    // Click: place a station (when armed by "+ Add ground station").
+    handler.setInputAction((e) => {
+      if (!state.placing) return;
+      const p = pickLatLon(v, e.position);
+      if (p) openStationModal(p.lat, p.lon);
+    }, C.ScreenSpaceEventType.LEFT_CLICK);
+
+    // Drag a station's marker to move it.
+    handler.setInputAction((e) => {
+      if (state.placing) return;
+      const picked = v.scene.pick(e.position);
+      const id = picked && picked.id && picked.id.id;
+      if (typeof id !== 'string' || id.indexOf('gs-') !== 0) return;
+      const gs = state.groundStations.find(g => g.id === Number(id.slice(3)));
+      if (!gs) return;
+      dragging = gs;
+      v.scene.screenSpaceCameraController.enableInputs = false;
+      globeEl.style.cursor = 'grabbing';
+    }, C.ScreenSpaceEventType.LEFT_DOWN);
+
+    handler.setInputAction((e) => {
+      if (!dragging) return;
+      const p = pickLatLon(v, e.endPosition);
+      if (!p) return;
+      dragging.lat = p.lat;
+      dragging.lon = p.lon;
+      dragging.marker.setLatLng([p.lat, p.lon]);
+      updateFootprint(dragging);   // redraws the 2D footprint and re-syncs the 3D station + cone
+      renderGsList();
+    }, C.ScreenSpaceEventType.MOUSE_MOVE);
+
+    handler.setInputAction(() => {
+      if (!dragging) return;
+      dragging = null;
+      v.scene.screenSpaceCameraController.enableInputs = true;
+      globeEl.style.cursor = state.placing ? 'crosshair' : '';
+      renderGsList();
+    }, C.ScreenSpaceEventType.LEFT_UP);
+  }
+
+  /* ---- Stations + cones ---- */
+
+  // Create or update a station's 3D marker, label, footprint ring and cone.
+  function syncStation3d(gs){
+    const v = state.globe;
+    if (!v) return;
+    const C = Cesium;
+    const color = C.Color.fromCssColorString(gs.color);
+    const g = gs.g3d || (gs.g3d = { entity: null, cone: null, extra: [] });
+    const ground = C.Cartesian3.fromDegrees(gs.lon, gs.lat, 0);
+    const text = `${gs.name}\n${gs.lat.toFixed(2)}°, ${gs.lon.toFixed(2)}° · mask ${gs.minElevDeg}°`;
+
+    if (!g.entity){
+      g.entity = v.entities.add({
+        id: 'gs-' + gs.id,
+        position: ground,
+        point: { pixelSize: 10, color: color, outlineColor: C.Color.fromCssColorString('#0A0E14'), outlineWidth: 2 },
+        label: {
+          text: text, font: '11px monospace', fillColor: C.Color.WHITE,
+          style: C.LabelStyle.FILL,
+          showBackground: true, backgroundColor: C.Color.fromCssColorString('#0d1117').withAlpha(0.8),
+          horizontalOrigin: C.HorizontalOrigin.LEFT, pixelOffset: new C.Cartesian2(12, -4),
+          scaleByDistance: new C.NearFarScalar(2e5, 1.1, 2e7, 0.55)
+        }
+      });
+    } else {
+      g.entity.position = ground;
+      g.entity.label.text = text;
+    }
+
+    // Rebuild the cone from scratch (72 vertices — cheap).
+    if (g.cone){ v.scene.primitives.remove(g.cone); g.cone = null; }
+    g.extra.forEach(e => v.entities.remove(e));
+    g.extra = [];
+
+    if (state.altitudeKm){
+      const radiusKm = footprintRadiusKm(state.altitudeKm, gs.minElevDeg);
+      const ring = circlePolygon(gs.lat, gs.lon, radiusKm).slice(0, -1);   // drop the closing duplicate
+      const n = ring.length;
+
+      // Cone with its tip on the station, opening upward: the top rim is the footprint ring lifted to
+      // satellite altitude (a satellite on that rim sits exactly at the mask elevation).
+      const rim = ring.map(p => C.Cartesian3.fromDegrees(p[1], p[0], state.altitudeKm * 1000));
+      const tip = ground;
+      const verts = new Float64Array((n + 1) * 3);
+      [tip].concat(rim).forEach((p, i) => { verts[i*3] = p.x; verts[i*3+1] = p.y; verts[i*3+2] = p.z; });
+      const idx = new Uint16Array(n * 3);
+      for (let i = 0; i < n; i++){ idx[i*3] = 0; idx[i*3+1] = 1 + i; idx[i*3+2] = 1 + ((i + 1) % n); }
+      const geometry = new C.Geometry({
+        attributes: new C.GeometryAttributes({
+          position: new C.GeometryAttribute({ componentDatatype: C.ComponentDatatype.DOUBLE, componentsPerAttribute: 3, values: verts })
+        }),
+        indices: idx,
+        primitiveType: C.PrimitiveType.TRIANGLES,
+        boundingSphere: C.BoundingSphere.fromVertices(Array.from(verts))
+      });
+      g.cone = v.scene.primitives.add(new C.Primitive({
+        geometryInstances: new C.GeometryInstance({
+          geometry: geometry,
+          attributes: { color: C.ColorGeometryInstanceAttribute.fromColor(color.withAlpha(0.14)) }
+        }),
+        appearance: new C.PerInstanceColorAppearance({ flat: true, translucent: true, closed: false }),
+        asynchronous: false, allowPicking: false, compressVertices: false
+      }));
+
+      // Top rim at satellite altitude, and the footprint ring on the surface (same ring as 2D).
+      g.extra.push(v.entities.add({ polyline: {
+        positions: rim.concat([rim[0]]), width: 1.5, material: color.withAlpha(0.75), arcType: C.ArcType.NONE
+      }}));
+      const surface = ring.map(p => C.Cartesian3.fromDegrees(p[1], p[0], 0));
+      g.extra.push(v.entities.add({ polyline: {
+        positions: surface.concat([surface[0]]), width: 2, material: color.withAlpha(0.9), arcType: C.ArcType.NONE
+      }}));
+      // Eight edges from the station up to the rim — these rise at the mask elevation.
+      const spokes = [];
+      for (let i = 0; i < n; i += Math.max(1, Math.round(n / 8))) spokes.push(tip, rim[i], tip);
+      g.extra.push(v.entities.add({ polyline: {
+        positions: spokes, width: 1, material: color.withAlpha(0.4), arcType: C.ArcType.NONE
+      }}));
+      // Mask angle, labelled on the rim.
+      g.extra.push(v.entities.add({
+        position: rim[0],
+        label: {
+          text: `${gs.minElevDeg}° mask`, font: '10px monospace', fillColor: color,
+          outlineColor: C.Color.BLACK, outlineWidth: 3, style: C.LabelStyle.FILL_AND_OUTLINE,
+          verticalOrigin: C.VerticalOrigin.BOTTOM, pixelOffset: new C.Cartesian2(0, -6),
+          scaleByDistance: new C.NearFarScalar(2e5, 1.1, 2e7, 0.55)
+        }
+      }));
+    }
+    globeRender();
+  }
+
+  function remove3dStation(gs){
+    const v = state.globe;
+    if (!v || !gs.g3d) return;
+    if (gs.g3d.cone) v.scene.primitives.remove(gs.g3d.cone);
+    gs.g3d.extra.forEach(e => v.entities.remove(e));
+    if (gs.g3d.entity) v.entities.remove(gs.g3d.entity);
+    gs.g3d = null;
+    globeRender();
+  }
+
+  /* ---- Satellite + track at true altitude ---- */
+
+  function set3dSat(){
+    const v = state.globe;
+    const p = state.satPos;
+    if (!v || !p) return;
+    const C = Cesium;
+    const pos = C.Cartesian3.fromDegrees(p.lon, p.lat, p.h * 1000);
+    const dropTo = C.Cartesian3.fromDegrees(p.lon, p.lat, 0);
+    const text = `${state.satName || 'Satellite'}\nalt ${p.h.toFixed(0)} km`;
+    if (!state.sat3d){
+      state.sat3d = v.entities.add({
+        position: pos,
+        point: { pixelSize: 14, color: C.Color.fromCssColorString('#F0A85C'), outlineColor: C.Color.fromCssColorString('#F0A85C').withAlpha(0.35), outlineWidth: 8 },
+        label: {
+          text: text, font: '11px monospace', fillColor: C.Color.fromCssColorString('#F0A85C'),
+          outlineColor: C.Color.BLACK, outlineWidth: 3, style: C.LabelStyle.FILL_AND_OUTLINE,
+          horizontalOrigin: C.HorizontalOrigin.LEFT, pixelOffset: new C.Cartesian2(12, -4),
+          scaleByDistance: new C.NearFarScalar(2e5, 1.1, 2e7, 0.55)
+        },
+        polyline: { positions: [pos, dropTo], width: 1, arcType: C.ArcType.NONE,
+          material: new C.PolylineDashMaterialProperty({ color: C.Color.fromCssColorString('#F0A85C').withAlpha(0.6), dashLength: 10 }) }
+      });
+    } else {
+      state.sat3d.position = pos;
+      state.sat3d.label.text = text;
+      state.sat3d.polyline.positions = [pos, dropTo];
+    }
+    globeRender();
+  }
+
+  function clear3dSat(){
+    if (state.globe && state.sat3d) state.globe.entities.remove(state.sat3d);
+    state.sat3d = null;
+    globeRender();
+  }
+
+  function clear3dTrack(){
+    if (state.globe) state.track3d.forEach(e => state.globe.entities.remove(e));
+    state.track3d = [];
+    globeRender();
+  }
+
+  // pts: [{lat, lon, h}] from sampleOrbit(). Cartesian paths are continuous, so no antimeridian splitting.
+  function draw3dTrack(pts){
+    const v = state.globe;
+    if (!v) return;
+    clear3dTrack();
+    if (pts.length < 2) return;
+    const C = Cesium;
+    const col = C.Color.fromCssColorString(ORBIT_COLOR);
+    const flat = [], high = [];
+    pts.forEach(p => { flat.push(p.lon, p.lat); high.push(p.lon, p.lat, p.h * 1000); });
+    state.track3d.push(
+      v.entities.add({ polyline: { positions: C.Cartesian3.fromDegreesArrayHeights(high), width: 1.6, arcType: C.ArcType.NONE, material: col.withAlpha(0.8) } }),
+      v.entities.add({ polyline: { positions: C.Cartesian3.fromDegreesArray(flat), width: 1.4, arcType: C.ArcType.NONE,
+        material: new C.PolylineDashMaterialProperty({ color: col.withAlpha(0.5), dashLength: 8 }) } })
+    );
+    globeRender();
+  }
+
+  /* ---- Camera ---- */
+
+  // Fly with the view centred on the GROUND point beneath the target. If the view centre is in the air
+  // (e.g. mid-altitude), Cesium zooms along the view ray and zooming out slides the camera off the globe.
+  function flyAbove(lon, lat, spanM, range){
+    const v = state.globe;
+    const C = Cesium;
+    v.camera.flyToBoundingSphere(new C.BoundingSphere(C.Cartesian3.fromDegrees(lon, lat, 0), spanM), {
+      offset: new C.HeadingPitchRange(0, C.Math.toRadians(-35), range),
+      duration: 1.4,
+      // flyToBoundingSphere leaves the camera in a local frame; restore the world frame so orbit/zoom behave.
+      complete: () => v.camera.lookAtTransform(C.Matrix4.IDENTITY)
+    });
+  }
+
+  function flyToStation(gs){
+    if (!state.globe) return;
+    const alt = (state.altitudeKm || 0) * 1000;
+    const reach = state.altitudeKm ? footprintRadiusKm(state.altitudeKm, gs.minElevDeg) * 1000 : 1.5e6;
+    const span = Math.max(reach, alt, 5e5);
+    flyAbove(gs.lon, gs.lat, span, span * 3);
+  }
+
+  function flyToSatellite(){
+    if (!state.globe || !state.satPos) return;
+    const p = state.satPos;
+    // Close enough to see the satellite hanging above the surface beneath it.
+    flyAbove(p.lon, p.lat, Math.max(p.h * 1000, 4e5), Math.max(p.h * 5000, 2.5e6));
+  }
+  document.getElementById('flySatBtn').addEventListener('click', flyToSatellite);
+
+  /* ---- 2D / 3D switch ---- */
+
+  function showView(v){
+    state.view = v;
+    view2dBtn.classList.toggle('on', v === '2d');
+    view3dBtn.classList.toggle('on', v === '3d');
+    mapEl.style.display = v === '2d' ? '' : 'none';
+    globeEl.style.display = v === '3d' ? 'block' : 'none';
+    globeHint.classList.toggle('show', v === '3d');
+    flySatRow.style.display = v === '3d' ? '' : 'none';
+    if (v === '2d') setTimeout(() => map.invalidateSize(), 0);
+  }
+
+  async function setView(v){
+    if (v === state.view) return;
+    if (v === '2d'){ showView('2d'); return; }
+    showView('3d');                       // the Cesium viewer needs a visible container to size itself
+    if (!state.globe){
+      globeMsg.textContent = 'Loading 3D globe…';
+      globeMsg.classList.add('show');
+    }
+    try{
+      const viewer = await ensureGlobe();
+      globeMsg.classList.remove('show');
+      viewer.resize();
+      state.groundStations.forEach(syncStation3d);
+      if (state.satPos) set3dSat();
+      if (trackSwitch.classList.contains('on') && state.satrec) drawGroundTrack();
+      globeRender();
+    } catch(err){
+      globeMsg.textContent = 'Could not start the 3D globe (network or WebGL problem). Staying in 2D.';
+      globeMsg.classList.add('show');
+      showView('2d');
+      setTimeout(() => globeMsg.classList.remove('show'), 4000);
+    }
+  }
+  view2dBtn.addEventListener('click', () => setView('2d'));
+  view3dBtn.addEventListener('click', () => setView('3d'));
 
   /* ============================================================
      TIME WINDOW DEFAULTS
