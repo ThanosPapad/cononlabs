@@ -332,6 +332,33 @@ html {
   gap: 8px;
 }
 .hero-video.is-full .hero-video-controls { display: none; }
+
+/* Full-length video sits on top of the loop and is revealed on click */
+.hero-video .hero-video-full {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.hero-video.is-full .hero-video-full { opacity: 1; pointer-events: auto; }
+.hero-video.is-full #heroVideo { visibility: hidden; }
+
+/* Loading spinner while the full video buffers */
+.hero-video.is-loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 34px;
+  height: 34px;
+  margin: -17px 0 0 -17px;
+  border: 2px solid rgba(255,255,255,0.25);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: hvSpin 0.8s linear infinite;
+  pointer-events: none;
+}
+@keyframes hvSpin { to { transform: rotate(360deg); } }
 .hv-btn {
   display: inline-flex;
   align-items: center;

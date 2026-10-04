@@ -53,68 +53,138 @@ if (yearEl) yearEl.textContent = new Date().getFullYear();
 })();
 
 /* ── Hero intro video ──────────────────────────────────────
-   Muted loop by default. "Play with sound" / fullscreen swap in the full
-   video (with audio) and play it from the start; when it ends, the loop returns. */
+   Muted loop by default. "Play with sound" / fullscreen reveal a second <video>
+   holding the full cut (with audio). It is warmed up in the background once the
+   page is idle, so the click starts playback from buffered data. When it ends,
+   the loop returns. Interactions are counted as GoatCounter events. */
 (function initHeroVideo() {
   const wrap  = document.getElementById('heroVideoWrap');
-  const video = document.getElementById('heroVideo');
-  if (!wrap || !video) return;
+  const loop  = document.getElementById('heroVideo');
+  if (!wrap || !loop) return;
 
-  const LOOP_SRC = video.getAttribute('src');
-  const FULL_SRC = 'assets/video/intro_full.mp4';
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const conn = navigator.connection || {};
 
-  if (reduceMotion.matches) { video.removeAttribute('autoplay'); video.pause(); }
+  // 720p cut for phones and slow links, 1080p otherwise
+  const useSmall = window.matchMedia('(max-width: 680px)').matches
+    || /(^|-)2g$|3g/.test(conn.effectiveType || '');
+  const FULL_SRC = useSmall ? 'assets/video/intro_full_720.mp4' : 'assets/video/intro_full.mp4';
+
+  /* GoatCounter events — each fires once per page view; no-op if blocked/missing */
+  const sent = new Set();
+  function track(name) {
+    if (sent.has(name)) return;
+    sent.add(name);
+    try {
+      if (window.goatcounter && window.goatcounter.count) {
+        window.goatcounter.count({ path: name, title: name, event: true });
+      }
+    } catch (e) { /* analytics must never break the page */ }
+  }
+
+  if (reduceMotion.matches) { loop.removeAttribute('autoplay'); loop.pause(); }
 
   // Pause the loop while it's off-screen
   new IntersectionObserver(([entry]) => {
     if (wrap.classList.contains('is-full') || reduceMotion.matches) return;
-    if (entry.isIntersecting) video.play().catch(() => {});
-    else video.pause();
+    if (entry.isIntersecting) loop.play().catch(() => {});
+    else loop.pause();
   }, { threshold: 0.25 }).observe(wrap);
 
+  /* Full video element — created lazily, buffered in the background */
+  let full = null;
+  function getFull() {
+    if (full) return full;
+    full = document.createElement('video');
+    full.className = 'hero-video-full';
+    full.src = FULL_SRC;
+    full.preload = 'auto';
+    full.playsInline = true;
+    full.setAttribute('playsinline', '');
+    full.setAttribute('poster', loop.getAttribute('poster'));
+    full.setAttribute('aria-label', 'Conon Labs intro video (with sound)');
+    wrap.insertBefore(full, wrap.querySelector('.hero-video-controls'));
+
+    full.addEventListener('playing', () => {
+      wrap.classList.remove('is-loading');
+      track('video-play-started');
+    });
+    full.addEventListener('waiting', () => wrap.classList.add('is-loading'));
+    full.addEventListener('timeupdate', () => {
+      if (!full.duration) return;
+      const pct = full.currentTime / full.duration;
+      if (pct >= 0.25) track('video-progress-25');
+      if (pct >= 0.5)  track('video-progress-50');
+      if (pct >= 0.75) track('video-progress-75');
+    });
+    full.addEventListener('ended', () => {
+      track('video-completed');
+      if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen();
+      backToLoop();
+    });
+    return full;
+  }
+
+  const canWarm = !conn.saveData && !/(^|-)2g$/.test(conn.effectiveType || '');
+  function warmUp() { if (canWarm) getFull(); }
+  const idle = window.requestIdleCallback || (cb => setTimeout(cb, 2500));
+  const warmWhenReady = () => idle(warmUp);
+  if (document.readyState === 'complete') warmWhenReady();
+  else window.addEventListener('load', warmWhenReady, { once: true });
+
   function playFull() {
-    wrap.classList.add('is-full');
-    video.src = FULL_SRC;
-    video.loop = false;
-    video.muted = false;
-    video.controls = true;
-    video.play().catch(() => {});
+    const v = getFull();
+    wrap.classList.add('is-full', 'is-loading');
+    loop.pause();
+    v.currentTime = 0;
+    v.muted = false;
+    v.controls = true;
+    v.play().catch(() => wrap.classList.remove('is-loading'));
+    return v;
   }
 
   function backToLoop() {
-    wrap.classList.remove('is-full');
-    video.controls = false;
-    video.muted = true;
-    video.loop = true;
-    video.src = LOOP_SRC;
-    if (!reduceMotion.matches) video.play().catch(() => {});
+    wrap.classList.remove('is-full', 'is-loading');
+    if (full) { full.pause(); full.controls = false; }
+    if (!reduceMotion.matches) loop.play().catch(() => {});
   }
 
-  function enterFullscreen() {
-    if (video.requestFullscreen) {
-      video.requestFullscreen()
+  function enterFullscreen(v) {
+    if (v.requestFullscreen) {
+      v.requestFullscreen()
         .then(() => {
           // Android: use the whole landscape screen for the 16:9 video
           if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {});
         })
         .catch(() => {});
-    } else if (video.webkitEnterFullscreen) {
-      video.webkitEnterFullscreen(); // iPhone Safari: native player, needs metadata loaded
+    } else if (v.webkitEnterFullscreen) {
+      v.webkitEnterFullscreen(); // iPhone Safari: native player, needs metadata loaded
     }
   }
 
-  document.getElementById('hvSound').addEventListener('click', playFull);
-  document.getElementById('hvFull').addEventListener('click', () => {
-    playFull();
-    // Standard API works straight from the click; iPhone's webkitEnterFullscreen
-    // throws until the new source has metadata, so only that path waits.
-    if (video.requestFullscreen || video.readyState >= 1) enterFullscreen();
-    else video.addEventListener('loadedmetadata', enterFullscreen, { once: true });
+  const soundBtn = document.getElementById('hvSound');
+  const fullBtn  = document.getElementById('hvFull');
+  [soundBtn, fullBtn].forEach(btn => {
+    ['pointerenter', 'touchstart'].forEach(evt =>
+      btn.addEventListener(evt, () => { if (!conn.saveData) getFull(); }, { passive: true, once: true }));
   });
-  video.addEventListener('ended', () => {
-    if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen();
-    backToLoop();
+
+  soundBtn.addEventListener('click', () => {
+    track('video-sound-click');
+    playFull();
+  });
+  fullBtn.addEventListener('click', () => {
+    track('video-fullscreen-click');
+    const v = playFull();
+    // Standard API works straight from the click; iPhone's webkitEnterFullscreen
+    // throws until the source has metadata, so only that path waits.
+    if (v.requestFullscreen || v.readyState >= 1) enterFullscreen(v);
+    else v.addEventListener('loadedmetadata', () => enterFullscreen(v), { once: true });
+  });
+
+  // Fullscreen entered via the native controls
+  document.addEventListener('fullscreenchange', () => {
+    if (document.fullscreenElement && document.fullscreenElement === full) track('video-fullscreen-native');
   });
 })();
 
