@@ -302,7 +302,8 @@
   .globe-msg{
     position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
     font-size:9.5px; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted);
-    z-index:5; display:none; text-align:center; line-height:1.8;
+    z-index:1100; display:none; text-align:center; line-height:1.8;
+    background:rgba(8,8,8,0.85); padding:10px 14px; max-width:80%;
   }
   .globe-msg.show{ display:block; }
   .globe-hint{
@@ -1312,10 +1313,11 @@
       if (trackSwitch.classList.contains('on') && state.satrec) drawGroundTrack();
       globeRender();
     } catch(err){
-      globeMsg.textContent = 'Could not start the 3D globe (network or WebGL problem). Staying in 2D.';
+      console.error('3D globe failed:', err);
+      globeMsg.textContent = 'Could not start the 3D globe (' + ((err && err.message) || 'network or WebGL problem') + '). Staying in 2D.';
       globeMsg.classList.add('show');
       showView('2d');
-      setTimeout(() => globeMsg.classList.remove('show'), 4000);
+      setTimeout(() => globeMsg.classList.remove('show'), 8000);
     }
   }
   view2dBtn.addEventListener('click', () => setView('2d'));

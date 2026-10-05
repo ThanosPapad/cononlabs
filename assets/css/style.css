@@ -595,6 +595,137 @@ footer {
   margin: 32px auto;
 }
 
+/* ─── ABOUT: roadmap video + step timeline ──────────────── */
+.roadmap-video { margin: 32px 0 56px; }
+.rv-head { display: flex; flex-direction: column; gap: 6px; margin: 0 0 18px; }
+.rv-kicker {
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.rv-title {
+  font-family: var(--font-disp);
+  font-size: clamp(30px, 5vw, 44px);
+  letter-spacing: 0.06em;
+  line-height: 1;
+  color: var(--accent);
+}
+.rv-frame {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: #050a14;
+  border: 1px solid rgba(110,150,255,0.28);
+  box-shadow: 0 0 50px rgba(70,120,255,0.16), inset 0 0 40px rgba(70,120,255,0.06);
+  animation: rvGlow 5s ease-in-out infinite;
+  transition: transform 0.35s ease, box-shadow 0.35s ease;
+}
+.rv-frame:hover { transform: translateY(-3px); box-shadow: 0 0 70px rgba(70,120,255,0.28), inset 0 0 40px rgba(70,120,255,0.08); }
+.rv-frame video { display: block; width: 100%; height: 100%; object-fit: contain; background: #000; }
+@keyframes rvGlow {
+  0%, 100% { box-shadow: 0 0 40px rgba(70,120,255,0.12), inset 0 0 40px rgba(70,120,255,0.05); }
+  50%      { box-shadow: 0 0 80px rgba(70,120,255,0.26), inset 0 0 40px rgba(70,120,255,0.08); }
+}
+
+/* HUD corner brackets */
+.rv-corner { position: absolute; width: 18px; height: 18px; border: 0 solid rgba(160,190,255,0.85); pointer-events: none; z-index: 2; }
+.rv-corner.tl { top: -7px;    left: -7px;  border-width: 1.5px 0 0 1.5px; }
+.rv-corner.tr { top: -7px;    right: -7px; border-width: 1.5px 1.5px 0 0; }
+.rv-corner.bl { bottom: -7px; left: -7px;  border-width: 0 0 1.5px 1.5px; }
+.rv-corner.br { bottom: -7px; right: -7px; border-width: 0 1.5px 1.5px 0; }
+
+/* Play button with a pulse ring */
+.rv-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 84px;
+  height: 84px;
+  margin: -42px 0 0 -42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8,12,24,0.55);
+  border: 1px solid rgba(255,255,255,0.55);
+  border-radius: 50%;
+  color: #fff;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: background 0.25s, color 0.25s, transform 0.25s;
+}
+.rv-play svg { width: 34px; height: 34px; fill: currentColor; margin-left: 4px; }
+.rv-play:hover, .rv-play:focus-visible { background: #fff; color: #000; transform: scale(1.06); }
+.rv-ring {
+  position: absolute;
+  inset: -1px;
+  border: 1px solid rgba(160,190,255,0.7);
+  border-radius: 50%;
+  animation: rvRing 2.6s ease-out infinite;
+  pointer-events: none;
+}
+@keyframes rvRing {
+  0%   { transform: scale(1);   opacity: 0.8; }
+  100% { transform: scale(1.9); opacity: 0; }
+}
+.roadmap-video.is-playing .rv-play { display: none; }
+.roadmap-video.is-playing .rv-frame { animation: none; }
+
+/* Step timeline */
+.roadmap-steps { position: relative; margin: 28px 0; padding-left: 44px; }
+.roadmap-steps::before {
+  content: '';
+  position: absolute;
+  left: 15px;
+  top: 30px;
+  bottom: 30px;
+  width: 1px;
+  background: linear-gradient(to bottom, rgba(110,150,255,0.15), rgba(110,150,255,0.55), rgba(110,150,255,0.15));
+}
+.rs-card {
+  position: relative;
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  margin: 0 0 16px;
+  padding: 24px 26px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg2);
+}
+.rs-card::before {
+  content: '';
+  position: absolute;
+  top: 29px;
+  left: -34px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 1.5px solid rgba(140,175,255,0.9);
+  box-shadow: 0 0 12px rgba(80,130,255,0.65);
+}
+.rs-num {
+  font-family: var(--font-disp);
+  font-size: 42px;
+  line-height: 0.9;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rv-frame, .rv-ring { animation: none; }
+  .rv-frame, .rv-play { transition: none; }
+}
+@media (max-width: 680px) {
+  .rv-play { width: 64px; height: 64px; margin: -32px 0 0 -32px; }
+  .rv-play svg { width: 26px; height: 26px; }
+  .roadmap-steps { padding-left: 28px; }
+  .roadmap-steps::before { left: 8px; }
+  .rs-card { gap: 16px; padding: 20px 18px; }
+  .rs-card::before { left: -25px; }
+  .rs-num { font-size: 32px; }
+}
+
 /* ─── Responsive ────────────────────────────────────────── */
 @media (max-width: 680px) {
   .nav-links { display: none; }

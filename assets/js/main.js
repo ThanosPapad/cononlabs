@@ -52,6 +52,18 @@ if (yearEl) yearEl.textContent = new Date().getFullYear();
   requestAnimationFrame(draw);
 })();
 
+/* ── GoatCounter events — each name fires once per page view; no-op if blocked ── */
+const sentEvents = new Set();
+function track(name) {
+  if (sentEvents.has(name)) return;
+  sentEvents.add(name);
+  try {
+    if (window.goatcounter && window.goatcounter.count) {
+      window.goatcounter.count({ path: name, title: name, event: true });
+    }
+  } catch (e) { /* analytics must never break the page */ }
+}
+
 /* ── Hero intro video ──────────────────────────────────────
    Muted loop by default. "Play with sound" / fullscreen reveal a second <video>
    holding the full cut (with audio). It is warmed up in the background once the
@@ -69,18 +81,6 @@ if (yearEl) yearEl.textContent = new Date().getFullYear();
   const useSmall = window.matchMedia('(max-width: 680px)').matches
     || /(^|-)2g$|3g/.test(conn.effectiveType || '');
   const FULL_SRC = useSmall ? 'assets/video/intro_full_720.mp4' : 'assets/video/intro_full.mp4';
-
-  /* GoatCounter events — each fires once per page view; no-op if blocked/missing */
-  const sent = new Set();
-  function track(name) {
-    if (sent.has(name)) return;
-    sent.add(name);
-    try {
-      if (window.goatcounter && window.goatcounter.count) {
-        window.goatcounter.count({ path: name, title: name, event: true });
-      }
-    } catch (e) { /* analytics must never break the page */ }
-  }
 
   if (reduceMotion.matches) { loop.removeAttribute('autoplay'); loop.pause(); }
 
@@ -273,7 +273,44 @@ async function loadMarkdown(el) {
   }
 }
 
-document.querySelectorAll('.md-content').forEach(loadMarkdown);
+Promise.all([...document.querySelectorAll('.md-content')].map(loadMarkdown))
+  .then(initRoadmapVideo);
+
+/* ── Roadmap video (About) — idle until clicked, loads nothing before that ── */
+function initRoadmapVideo() {
+  const wrap  = document.getElementById('roadmapVideoWrap');
+  const video = document.getElementById('roadmapVideo');
+  const play  = document.getElementById('roadmapPlay');
+  if (!wrap || !video || !play) return;
+
+  const conn = navigator.connection || {};
+  const small = window.matchMedia('(max-width: 680px)').matches || /(^|-)2g$|3g/.test(conn.effectiveType || '');
+  const SRC = small ? 'assets/video/roadmap_720.mp4' : 'assets/video/roadmap.mp4';
+
+  play.addEventListener('click', () => {
+    track('roadmap-play');
+    if (!video.getAttribute('src')) video.src = SRC;
+    wrap.classList.add('is-playing');
+    video.controls = true;
+    video.muted = false;
+    video.play().catch(() => wrap.classList.remove('is-playing'));
+  });
+
+  video.addEventListener('timeupdate', () => {
+    if (!video.duration) return;
+    const pct = video.currentTime / video.duration;
+    if (pct >= 0.25) track('roadmap-progress-25');
+    if (pct >= 0.5)  track('roadmap-progress-50');
+    if (pct >= 0.75) track('roadmap-progress-75');
+  });
+  video.addEventListener('ended', () => {
+    track('roadmap-completed');
+    if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen();
+    wrap.classList.remove('is-playing');
+    video.controls = false;
+    video.load(); // back to the poster
+  });
+}
 
 /* ── Intersection observer — section fade-in ─────────────── */
 const observer = new IntersectionObserver(entries => {
