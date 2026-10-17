@@ -315,10 +315,15 @@ function initResearchExplorer() {
     timer = setTimeout(() => { select(index + 1); arm(); }, INTERVAL);
   }
 
+  // Single-column layout: the panel sits below the whole list, so bring it into view on tap
+  const narrow = window.matchMedia('(max-width: 680px)');
+  if (narrow.matches) stopped = true;
+
   function userSelect(i, focus) {
     stopped = true;
     clear();
     select(i, focus);
+    if (narrow.matches) panels[index].scrollIntoView({ behavior: 'smooth', block: 'start' });
     if (typeof track === 'function') track('research-tab-' + (index + 1));
   }
 

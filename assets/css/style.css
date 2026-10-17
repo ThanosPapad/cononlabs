@@ -768,7 +768,7 @@ footer {
 @keyframes reProgress { to { transform: scaleX(1); } }
 
 .re-panels { display: grid; min-width: 0; }
-.re-panel { grid-area: 1 / 1; min-width: 0; }
+.re-panel { grid-area: 1 / 1; min-width: 0; scroll-margin-top: 90px; }
 .re-js .re-panel { opacity: 0; visibility: hidden; transform: translateY(8px); transition: opacity 0.4s ease, transform 0.4s ease, visibility 0s 0.4s; }
 .re-js .re-panel.is-active { opacity: 1; visibility: visible; transform: none; transition: opacity 0.4s ease, transform 0.4s ease; }
 .re-img {
