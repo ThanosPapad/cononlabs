@@ -274,7 +274,72 @@ async function loadMarkdown(el) {
 }
 
 Promise.all([...document.querySelectorAll('.md-content')].map(loadMarkdown))
-  .then(initRoadmapVideo);
+  .then(() => { initRoadmapVideo(); initResearchExplorer(); });
+
+/* ── Research explorer — tabs with slow autoplay while in view ── */
+function initResearchExplorer() {
+  const root = document.querySelector('.research-explorer');
+  if (!root) return;
+  const tabs   = [...root.querySelectorAll('.re-tab')];
+  const panels = [...root.querySelectorAll('.re-panel')];
+  const INTERVAL = 8000;
+  const reduced  = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let index = 0, timer = null, visible = false, stopped = reduced, hovering = false;
+
+  root.classList.add('re-js');
+  root.style.setProperty('--re-interval', INTERVAL + 'ms');
+
+  function select(i, focus) {
+    index = (i + tabs.length) % tabs.length;
+    tabs.forEach((t, n) => {
+      const on = n === index;
+      t.classList.toggle('is-active', on);
+      t.setAttribute('aria-selected', on);
+      t.tabIndex = on ? 0 : -1;
+      t.classList.remove('is-timing');
+    });
+    panels.forEach((p, n) => p.classList.toggle('is-active', n === index));
+    if (focus) tabs[index].focus();
+  }
+
+  function clear() {
+    clearTimeout(timer);
+    tabs.forEach(t => t.classList.remove('is-timing'));
+  }
+
+  function arm() {
+    clear();
+    if (stopped || hovering || !visible) return;
+    void tabs[index].offsetWidth; // restart the progress animation
+    tabs[index].classList.add('is-timing');
+    timer = setTimeout(() => { select(index + 1); arm(); }, INTERVAL);
+  }
+
+  function userSelect(i, focus) {
+    stopped = true;
+    clear();
+    select(i, focus);
+    if (typeof track === 'function') track('research-tab-' + (index + 1));
+  }
+
+  tabs.forEach((t, n) => {
+    t.addEventListener('click', () => userSelect(n));
+    t.addEventListener('keydown', e => {
+      const next = { ArrowDown: index + 1, ArrowRight: index + 1, ArrowUp: index - 1, ArrowLeft: index - 1, Home: 0, End: tabs.length - 1 }[e.key];
+      if (next === undefined) return;
+      e.preventDefault();
+      userSelect(next, true);
+    });
+  });
+
+  root.addEventListener('mouseenter', () => { hovering = true; clear(); });
+  root.addEventListener('mouseleave', () => { hovering = false; arm(); });
+
+  new IntersectionObserver(([entry]) => {
+    visible = entry.isIntersecting;
+    visible ? arm() : clear();
+  }, { threshold: 0.4 }).observe(root);
+}
 
 /* ── Roadmap video (About) — idle until clicked, loads nothing before that ── */
 function initRoadmapVideo() {
