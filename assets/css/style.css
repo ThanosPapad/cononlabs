@@ -792,6 +792,12 @@ footer {
   line-height: 1.05;
 }
 .md-content .re-panel p { margin-bottom: 0; font-size: 14px; line-height: 1.7; }
+.md-content .re-panel p + p { margin-top: 12px; }
+/* square transparent product art: framed 4:3 card, art contained */
+.re-img-contain { aspect-ratio: 4 / 3; object-fit: contain; padding: 14px; background: var(--bg2); }
+.re-list-label { margin: 18px 0 10px; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.md-content .re-list { margin: 0; }
+.md-content .re-list li { font-size: 13px; line-height: 1.6; margin-bottom: 7px; }
 /* without JS every panel shows, stacked */
 .research-explorer:not(.re-js) .re-panels { gap: 48px; }
 .research-explorer:not(.re-js) .re-panel { grid-area: auto; }

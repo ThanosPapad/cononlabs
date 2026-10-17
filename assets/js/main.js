@@ -274,12 +274,10 @@ async function loadMarkdown(el) {
 }
 
 Promise.all([...document.querySelectorAll('.md-content')].map(loadMarkdown))
-  .then(() => { initRoadmapVideo(); initResearchExplorer(); });
+  .then(() => { initRoadmapVideo(); document.querySelectorAll('.research-explorer').forEach(initExplorer); });
 
-/* ── Research explorer — tabs with slow autoplay while in view ── */
-function initResearchExplorer() {
-  const root = document.querySelector('.research-explorer');
-  if (!root) return;
+/* ── Explorer (Research, Products) — tabs with slow autoplay while in view ── */
+function initExplorer(root) {
   const tabs   = [...root.querySelectorAll('.re-tab')];
   const panels = [...root.querySelectorAll('.re-panel')];
   const INTERVAL = 8000;
@@ -324,7 +322,7 @@ function initResearchExplorer() {
     clear();
     select(i, focus);
     if (narrow.matches) panels[index].scrollIntoView({ behavior: 'smooth', block: 'start' });
-    if (typeof track === 'function') track('research-tab-' + (index + 1));
+    if (typeof track === 'function') track((root.dataset.track || 'research') + '-tab-' + (index + 1));
   }
 
   tabs.forEach((t, n) => {
